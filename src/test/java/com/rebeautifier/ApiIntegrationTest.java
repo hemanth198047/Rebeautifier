@@ -507,6 +507,54 @@ class ApiIntegrationTest {
 
     @Test
     @Order(9)
+    void searchExportAndImport() throws Exception {
+        mockMvc.perform(get("/api/v1/search").session(session).param("q", "a"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(get("/api/v1/search").session(session).param("q", "Accepted takeaways"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hits.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)))
+                .andExpect(jsonPath("$.hits[0].type").value("NOTE"));
+
+        MvcResult mdExport = mockMvc.perform(get("/api/v1/books/" + bookId + "/export")
+                        .session(session)
+                        .param("format", "markdown"))
+                .andExpect(status().isOk())
+                .andReturn();
+        assertThat(mdExport.getResponse().getContentAsString()).contains("# Integration Book");
+        MvcResult jsonExport = mockMvc.perform(get("/api/v1/books/" + bookId + "/export")
+                        .session(session)
+                        .param("format", "json"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String exportBody = jsonExport.getResponse().getContentAsString();
+        assertThat(exportBody).contains("rebeautifier.book-backup");
+        assertThat(exportBody).contains("schemaVersion");
+
+        mockMvc.perform(post("/api/v1/books/import")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"schema\":\"wrong\",\"schemaVersion\":1,\"book\":{\"title\":\"X\"}}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("IMPORT_INVALID"));
+
+        mockMvc.perform(post("/api/v1/books/import")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(exportBody))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.title").value("Integration Book"))
+                .andExpect(jsonPath("$.myRole").value("OWNER"));
+
+        mockMvc.perform(get("/api/v1/books").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(2)));
+    }
+
+    @Test
+    @Order(10)
     void logoutClearsSession() throws Exception {
         mockMvc.perform(post("/api/v1/auth/logout").session(session).with(csrf()))
                 .andExpect(status().isNoContent());

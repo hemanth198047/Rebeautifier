@@ -51,6 +51,12 @@ export function LibraryPage() {
           Rebeautifier<span>.</span>
         </div>
         <div className="topbar-actions">
+          <Link className="btn btn-ghost" to="/search">
+            Search
+          </Link>
+          <Link className="btn btn-ghost" to="/backup">
+            Backup
+          </Link>
           <AiStatusChip />
           <span className="muted">{user?.displayName}</span>
           <button className="btn btn-ghost" type="button" onClick={() => void logout()}>

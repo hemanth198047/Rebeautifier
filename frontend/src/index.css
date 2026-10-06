@@ -1129,3 +1129,20 @@ select:focus {
   from { background-position: 200% 0; }
   to { background-position: -200% 0; }
 }
+
+.search-form {
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.search-form input {
+  flex: 1;
+  min-width: 220px;
+}
+
+.search-results {
+  display: grid;
+  gap: 1rem;
+}
