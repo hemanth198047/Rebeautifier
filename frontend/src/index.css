@@ -703,9 +703,9 @@ select:focus {
 }
 
 .save-saved {
-  color: var(--success);
-  background: rgba(5, 150, 105, 0.12);
-  border-color: rgba(5, 150, 105, 0.35);
+  color: #047857;
+  background: rgba(5, 150, 105, 0.16);
+  border-color: rgba(5, 150, 105, 0.45);
   font-weight: 600;
 }
 
@@ -717,14 +717,28 @@ select:focus {
 
 .save-idle { color: var(--text-muted); }
 
-.btn-save-ok {
-  background: var(--success) !important;
-  border-color: var(--success) !important;
+.btn-save-ok,
+.btn-save-ok:hover {
+  background: linear-gradient(135deg, #059669, #047857) !important;
+  border-color: #047857 !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 20px rgba(5, 150, 105, 0.28);
 }
 
-.btn-save-fail {
-  background: var(--danger) !important;
-  border-color: var(--danger) !important;
+.btn-save-fail,
+.btn-save-fail:hover {
+  background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
+  border-color: #b91c1c !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 20px rgba(220, 38, 38, 0.25);
+}
+
+.save-success-banner {
+  background: #d1fae5 !important;
+  border: 1px solid #34d399 !important;
+  color: #064e3b !important;
+  font-weight: 600;
+  font-family: var(--font-ui);
 }
 
 .editor-shell {
