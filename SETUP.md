@@ -6,6 +6,8 @@ Self-hosted install. No cloud accounts required.
 
 Requirements: Docker Engine + Docker Compose v2.
 
+On Windows, start **Docker Desktop** first and wait until it shows Running before using `start.bat`.
+
 **Linux / macOS**
 
 ```bash
