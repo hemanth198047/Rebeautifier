@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { api, ApiError, type User } from '../api'
 import { useAuth } from '../auth'
+import { AuthLandingLayout } from '../components/AuthLandingLayout'
 
 export function LoginPage() {
   const { user, setUser, loading } = useAuth()
@@ -34,48 +35,37 @@ export function LoginPage() {
   }
 
   return (
-    <div className="hero-auth">
-      <section className="hero-panel">
-        <p className="hero-kicker">Reading room</p>
-        <h1 className="hero-brand">Rebeautifier</h1>
-        <p className="hero-copy">
-          A calm place to keep thoughts in books, chapters, and sections — ready for later refinement.
-        </p>
-      </section>
-      <section className="auth-panel">
-        <div className="auth-card">
-          <h1>Welcome back</h1>
-          <p>Sign in to open your library.</p>
-          {error && <div className="error-banner">{error}</div>}
-          <form className="form-stack" onSubmit={onSubmit}>
-            <label>
-              Username or email
-              <input
-                value={usernameOrEmail}
-                onChange={(e) => setUsernameOrEmail(e.target.value)}
-                autoComplete="username"
-                required
-              />
-            </label>
-            <label>
-              Password
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                required
-              />
-            </label>
-            <button className="btn btn-primary" type="submit" disabled={submitting}>
-              {submitting ? 'Signing in…' : 'Sign in'}
-            </button>
-          </form>
-          <p style={{ marginTop: '1.25rem' }}>
-            New here? <Link to="/register">Create an account</Link>
-          </p>
-        </div>
-      </section>
-    </div>
+    <AuthLandingLayout mode="login">
+      <h1>Sign in</h1>
+      <p>Use your username or email for this install.</p>
+      {error && <div className="error-banner">{error}</div>}
+      <form className="form-stack" onSubmit={onSubmit}>
+        <label>
+          Username or email
+          <input
+            value={usernameOrEmail}
+            onChange={(e) => setUsernameOrEmail(e.target.value)}
+            autoComplete="username"
+            required
+          />
+        </label>
+        <label>
+          Password
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            required
+          />
+        </label>
+        <button className="btn btn-primary" type="submit" disabled={submitting}>
+          {submitting ? 'Signing in…' : 'Sign in'}
+        </button>
+      </form>
+      <p className="landing-auth-switch">
+        New here? <Link to="/register">Create an account</Link>
+      </p>
+    </AuthLandingLayout>
   )
 }

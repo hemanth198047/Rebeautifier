@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { api, ApiError, type User } from '../api'
 import { useAuth } from '../auth'
+import { AuthLandingLayout } from '../components/AuthLandingLayout'
 
 export function RegisterPage() {
   const { user, setUser, loading } = useAuth()
@@ -36,51 +37,40 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="hero-auth">
-      <section className="hero-panel">
-        <p className="hero-kicker">Begin gently</p>
-        <h1 className="hero-brand">Rebeautifier</h1>
-        <p className="hero-copy">
-          Create an account on this install and start arranging thoughts into a living library.
-        </p>
-      </section>
-      <section className="auth-panel">
-        <div className="auth-card">
-          <h1>Create account</h1>
-          <p>Local to this installation — no cloud account required.</p>
-          {error && <div className="error-banner">{error}</div>}
-          <form className="form-stack" onSubmit={onSubmit}>
-            <label>
-              Display name
-              <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
-            </label>
-            <label>
-              Username
-              <input value={username} onChange={(e) => setUsername(e.target.value)} required minLength={3} />
-            </label>
-            <label>
-              Email
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            </label>
-            <label>
-              Password
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={8}
-              />
-            </label>
-            <button className="btn btn-primary" type="submit" disabled={submitting}>
-              {submitting ? 'Creating…' : 'Create account'}
-            </button>
-          </form>
-          <p style={{ marginTop: '1.25rem' }}>
-            Already have an account? <Link to="/login">Sign in</Link>
-          </p>
-        </div>
-      </section>
-    </div>
+    <AuthLandingLayout mode="register">
+      <h1>Create account</h1>
+      <p>Local to this installation — no cloud account required.</p>
+      {error && <div className="error-banner">{error}</div>}
+      <form className="form-stack" onSubmit={onSubmit}>
+        <label>
+          Display name
+          <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} required maxLength={120} />
+        </label>
+        <label>
+          Username
+          <input value={username} onChange={(e) => setUsername(e.target.value)} required minLength={3} />
+        </label>
+        <label>
+          Email
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        </label>
+        <label>
+          Password
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={8}
+          />
+        </label>
+        <button className="btn btn-primary" type="submit" disabled={submitting}>
+          {submitting ? 'Creating…' : 'Create account'}
+        </button>
+      </form>
+      <p className="landing-auth-switch">
+        Already have an account? <Link to="/login">Sign in</Link>
+      </p>
+    </AuthLandingLayout>
   )
 }
