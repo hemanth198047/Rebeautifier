@@ -88,6 +88,11 @@ public class ExportImportService {
         BookBackupDocument.BookPayload payload = buildBookPayload(book);
         StringBuilder md = new StringBuilder();
         md.append("# ").append(escapeMd(payload.title())).append("\n\n");
+        if (payload.coverBase64() != null && !payload.coverBase64().isBlank()) {
+            md.append("_Cover image is present on this book (")
+                    .append(payload.coverMime() != null ? payload.coverMime() : "image")
+                    .append("). Use JSON export to preserve the binary cover; Markdown cannot embed it._\n\n");
+        }
         if (payload.description() != null && !payload.description().isBlank()) {
             md.append(payload.description().trim()).append("\n\n");
         }

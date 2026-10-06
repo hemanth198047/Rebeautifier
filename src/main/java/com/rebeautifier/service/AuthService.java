@@ -85,6 +85,19 @@ public class AuthService {
         return toResponse(user);
     }
 
+    @Transactional
+    public void changePassword(String currentPassword, String newPassword) {
+        User user = requireCurrentUser();
+        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            throw ApiException.badRequest("Current password is incorrect");
+        }
+        if (currentPassword.equals(newPassword)) {
+            throw ApiException.badRequest("New password must be different from the current password");
+        }
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
+
     @Transactional(readOnly = true)
     public User requireCurrentUser() {
         AppUserDetails principal = currentPrincipal();
