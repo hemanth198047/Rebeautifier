@@ -11,6 +11,7 @@ import {
 } from '../api'
 import { useAuth } from '../auth'
 import { RichTextEditor } from '../components/RichTextEditor'
+import { RefinePanel } from '../components/RefinePanel'
 
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'failed'
 
@@ -375,6 +376,18 @@ export function NotePage() {
             </div>
           )}
         </section>
+
+        {note && (
+          <RefinePanel
+            noteId={note.id}
+            canEdit={!!canEdit}
+            noteBodyRich={bodyRich}
+            contentVersion={contentVersion}
+            onNoteUpdated={(updated) => {
+              applyNote(updated)
+            }}
+          />
+        )}
       </main>
     </div>
   )

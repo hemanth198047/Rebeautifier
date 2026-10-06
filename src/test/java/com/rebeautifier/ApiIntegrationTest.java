@@ -44,6 +44,7 @@ class ApiIntegrationTest {
     private static UUID bookId;
     private static UUID chapterId;
     private static UUID sectionId;
+    private static UUID noteIdForAi;
 
     @Test
     @Order(1)
@@ -210,6 +211,7 @@ class ApiIntegrationTest {
                 .andExpect(jsonPath("$.tags[0]").value("seed"))
                 .andReturn();
         UUID bookNoteId = UUID.fromString(objectMapper.readTree(bookNote.getResponse().getContentAsString()).get("id").asText());
+        noteIdForAi = bookNoteId;
 
         mockMvc.perform(post("/api/v1/books/" + bookId + "/notes")
                         .session(session)
@@ -308,6 +310,127 @@ class ApiIntegrationTest {
 
     @Test
     @Order(7)
+    void refineAcceptAndStaleWithMockOllama() throws Exception {
+        mockMvc.perform(get("/api/v1/system/ai-status").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.available").value(true))
+                .andExpect(jsonPath("$.model").value("llama3.2:1b"));
+
+        MvcResult refine = mockMvc.perform(post("/api/v1/notes/" + noteIdForAi + "/refinements")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"mode":"GRAMMAR"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("SUCCEEDED"))
+                .andExpect(jsonPath("$.mode").value("GRAMMAR"))
+                .andExpect(jsonPath("$.resultRich").isNotEmpty())
+                .andReturn();
+        UUID revisionId = UUID.fromString(objectMapper.readTree(refine.getResponse().getContentAsString()).get("id").asText());
+
+        mockMvc.perform(post("/api/v1/notes/" + noteIdForAi + "/refinements")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"mode":"SUMMARY"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.mode").value("SUMMARY"));
+
+        mockMvc.perform(get("/api/v1/notes/" + noteIdForAi + "/refinements").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()", org.hamcrest.Matchers.greaterThanOrEqualTo(2)));
+
+        // Change note so prior revision becomes stale on accept path
+        mockMvc.perform(patch("/api/v1/notes/" + noteIdForAi)
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "expectedContentVersion":2,
+                                  "bodyRich":"<p>Changed after refine</p>",
+                                  "status":"SAVED"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contentVersion").value(3));
+
+        mockMvc.perform(post("/api/v1/refinements/" + revisionId + "/accept")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REVISION_STALE"));
+
+        MvcResult freshRefine = mockMvc.perform(post("/api/v1/notes/" + noteIdForAi + "/refinements")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"mode":"TAKEAWAYS"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("SUCCEEDED"))
+                .andReturn();
+        UUID freshId = UUID.fromString(objectMapper.readTree(freshRefine.getResponse().getContentAsString()).get("id").asText());
+
+        mockMvc.perform(post("/api/v1/refinements/" + freshId + "/accept")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"editedBodyRich":"<p>Accepted takeaways</p>"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bodyRich").value("<p>Accepted takeaways</p>"))
+                .andExpect(jsonPath("$.bodyOriginal").value("<p>Original capture</p>"));
+
+        mockMvc.perform(post("/api/v1/notes/" + noteIdForAi + "/refinements")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"mode":"ORGANIZE"}
+                                """))
+                .andExpect(status().isCreated());
+
+        MvcResult qa = mockMvc.perform(post("/api/v1/notes/" + noteIdForAi + "/refinements")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"mode":"QA","question":"What changed?"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.mode").value("QA"))
+                .andReturn();
+        UUID qaId = UUID.fromString(objectMapper.readTree(qa.getResponse().getContentAsString()).get("id").asText());
+
+        mockMvc.perform(post("/api/v1/refinements/" + qaId + "/reject")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REJECTED"));
+
+        mockMvc.perform(post("/api/v1/refinements/" + qaId + "/regenerate")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.mode").value("QA"))
+                .andExpect(jsonPath("$.status").value("SUCCEEDED"));
+    }
+
+    @Test
+    @Order(8)
     void logoutClearsSession() throws Exception {
         mockMvc.perform(post("/api/v1/auth/logout").session(session).with(csrf()))
                 .andExpect(status().isNoContent());

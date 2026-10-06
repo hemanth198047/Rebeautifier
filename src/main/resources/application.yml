@@ -35,6 +35,12 @@ rebeautifier:
   cors-origins: ${CORS_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
   cover-storage-path: ${COVER_STORAGE_PATH:./data/covers}
   seed-demo-data: ${SEED_DEMO_DATA:true}
+  ollama:
+    base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+    model: ${OLLAMA_MODEL:llama3.2:1b}
+    timeout-seconds: ${OLLAMA_TIMEOUT_SECONDS:90}
+    max-concurrent: ${OLLAMA_MAX_CONCURRENT:1}
+    mock-enabled: ${OLLAMA_MOCK_ENABLED:false}
 
 logging:
   level:

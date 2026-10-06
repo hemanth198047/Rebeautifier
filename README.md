@@ -1,6 +1,6 @@
 # Rebeautifier
 
-A calm, installable reading library for organizing thoughts as **Book → Chapter → Section → Notes**. Multi-user accounts with Owner / Editor / Viewer membership. Rich-text notes work without AI. Optional local AI via Ollama arrives in later phases.
+A calm, installable reading library for organizing thoughts as **Book → Chapter → Section → Notes**. Multi-user accounts with Owner / Editor / Viewer membership. Rich-text notes work without AI. Optional local AI refine via **Ollama** (backend-only).
 
 ## Stack
 
@@ -8,7 +8,9 @@ A calm, installable reading library for organizing thoughts as **Book → Chapte
 - PostgreSQL 16 + Flyway
 - Spring Security (cookie session)
 - React + Vite + TypeScript SPA (`frontend/`)
-- Docker Compose (`api` + `db`)
+- TipTap rich-text notes
+- Docker Compose (`api` + `db`, optional `ollama` profile)
+- Ollama HTTP API (local only)
 
 ## Quick start (Docker Compose)
 
@@ -27,13 +29,25 @@ Demo login (seeded on first boot):
 
 Second demo user: `editor` / `password123` (editor on *Morning Pages*).
 
+### Optional AI (Ollama)
+
+```bash
+docker compose --profile ai up --build
+# then pull a small model into the ollama service, e.g.:
+docker compose --profile ai exec ollama ollama pull llama3.2:1b
+```
+
+Default model: `llama3.2:1b` (4 GB RAM friendly). Override with `OLLAMA_MODEL` / `OLLAMA_BASE_URL`.
+
+Without the AI profile, notes still work; the UI shows **AI offline**.
+
 Stop:
 
 ```bash
 docker compose down
 ```
 
-Data persists in Docker volumes (`pgdata`, `covers`). Restart with `docker compose up` to confirm library data survives.
+Data persists in Docker volumes (`pgdata`, `covers`, `ollama`).
 
 ## Local development (non-Docker)
 
@@ -54,6 +68,8 @@ sudo -u postgres psql -c "CREATE DATABASE rebeautifier OWNER rebeautifier;"
 
 API listens on [http://localhost:8080](http://localhost:8080).
 
+Env knobs: `OLLAMA_BASE_URL` (default `http://localhost:11434`), `OLLAMA_MODEL` (default `llama3.2:1b`), `OLLAMA_MAX_CONCURRENT` (default `1`).
+
 ### 3. SPA (Vite)
 
 ```bash
@@ -64,7 +80,15 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173). Vite proxies `/api` to `:8080`.
 
-### 4. Tests
+### 4. Optional Ollama
+
+Install from [ollama.com](https://ollama.com), then:
+
+```bash
+ollama pull llama3.2:1b
+```
+
+### 5. Tests
 
 ```bash
 # create once
@@ -87,7 +111,7 @@ cd Rebeautifier
 docker compose up --build
 ```
 
-Then visit http://localhost:8080 → sign in as `reader` / `password123` → open **Morning Pages** → browse chapters, sections, and seeded notes → open a note, edit with the rich-text editor, Save → create a draft note → restart Compose and confirm notes remain.
+Then visit http://localhost:8080 → sign in as `reader` / `password123` → open **Morning Pages** → open a note → edit/save → use **Refine with AI** (shows offline if Ollama is absent) → restart Compose and confirm notes remain.
 
 ## API overview (`/api/v1`)
 
@@ -98,6 +122,7 @@ Then visit http://localhost:8080 → sign in as `reader` / `password123` → ope
 | Chapters | list/create/reorder under book; patch/delete by id |
 | Sections | list/create/reorder under chapter; patch/delete by id |
 | Notes | list/create under book; get/patch/delete by id; reorder; draft/saved + content_version |
+| AI | `GET /system/ai-status`; note refinements create/list; accept/reject/regenerate |
 | Health | `GET /health`, `GET /health/ready` |
 
 Auth uses an HTTP-only session cookie (`REBEAUTIFIER_SESSION`) plus CSRF (`XSRF-TOKEN` cookie / `X-XSRF-TOKEN` header) for mutating requests.
@@ -114,4 +139,4 @@ docker-compose.yml
 
 ## Phase status
 
-Phase 2 (notes without AI) — TipTap rich-text editor, draft/saved notes, autosave, ACL, sample seed notes. See project progress docs in the Cursor Project store.
+Phase 3 (Ollama integration) — AI status, five refine modes, revision compare/accept/reject/regenerate, stale handling, concurrency limit. Notes remain usable when AI is offline.

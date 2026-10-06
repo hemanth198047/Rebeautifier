@@ -71,6 +71,42 @@ export type Member = {
   acceptedAt: string | null
 }
 
+export type RefineMode = 'GRAMMAR' | 'ORGANIZE' | 'SUMMARY' | 'TAKEAWAYS' | 'QA'
+export type RevisionStatus = 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'STALE' | 'ACCEPTED' | 'REJECTED'
+
+export type NoteRevision = {
+  id: string
+  noteId: string
+  mode: RefineMode
+  inputContentVersion: number
+  inputHash: string
+  status: RevisionStatus
+  staleRelativeToNote: boolean
+  resultRich: string | null
+  resultPlain: string | null
+  modelName: string | null
+  errorMessage: string | null
+  question: string | null
+  createdById: string
+  createdByDisplayName: string
+  createdAt: string
+  finalizedAt: string | null
+}
+
+export type AiStatus = {
+  available: boolean
+  reachable: boolean
+  modelAvailable: boolean
+  model: string
+  baseUrl: string
+  message: string
+  latencyMs: number
+  inFlight: number
+  maxConcurrent: number
+  models: string[]
+  setupHint: string
+}
+
 export class ApiError extends Error {
   code: string
   status: number
