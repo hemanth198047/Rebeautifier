@@ -139,4 +139,4 @@ docker-compose.yml
 
 ## Phase status
 
-Phase 3 (Ollama integration) — AI status, five refine modes, revision compare/accept/reject/regenerate, stale handling, concurrency limit. Notes remain usable when AI is offline.
+Phase 4 (complete AI review workflow) — polished compare/accept/reject/regenerate UX, save-before-refine, AI status chip, multi-user refine ACL. Search/export come next.

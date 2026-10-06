@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../auth'
 import { RichTextEditor } from '../components/RichTextEditor'
 import { RefinePanel } from '../components/RefinePanel'
+import { AiStatusChip } from '../components/AiStatusChip'
 
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'failed'
 
@@ -87,7 +88,7 @@ export function NotePage() {
   }, [title, bodyRich, status, pageStart, pageEnd, tagsInput])
 
   const save = useCallback(
-    async (opts?: { statusOverride?: NoteStatus; manual?: boolean }) => {
+    async (opts?: { statusOverride?: NoteStatus; manual?: boolean }): Promise<Note | void> => {
       if (!canEdit || !note) return
       const payload = latestPayload.current
       const nextStatus = opts?.statusOverride ?? payload.status
@@ -119,6 +120,7 @@ export function NotePage() {
             if (!dirtyRef.current) setSaveState('idle')
           }, 1600)
         }
+        return updated
       } catch (err) {
         dirtyRef.current = true
         setSaveState('failed')
@@ -127,6 +129,7 @@ export function NotePage() {
         } else {
           setError(err instanceof ApiError ? err.message : 'Save failed')
         }
+        throw err
       }
     },
     [applyNote, canEdit, note, noteId],
@@ -217,6 +220,7 @@ export function NotePage() {
         </Link>
         <div className="topbar-actions">
           <span className={`save-indicator save-${saveState}`}>{saveLabel}</span>
+          <AiStatusChip compact />
           <span className="muted">{user?.displayName}</span>
           <button className="btn btn-ghost" type="button" onClick={() => void logout()}>
             Sign out
@@ -383,6 +387,10 @@ export function NotePage() {
             canEdit={!!canEdit}
             noteBodyRich={bodyRich}
             contentVersion={contentVersion}
+            noteDirty={saveState === 'dirty' || saveState === 'failed' || dirtyRef.current}
+            onEnsureSaved={async () => {
+              await save({ manual: true })
+            }}
             onNoteUpdated={(updated) => {
               applyNote(updated)
             }}

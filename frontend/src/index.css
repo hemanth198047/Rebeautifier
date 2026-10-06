@@ -983,3 +983,149 @@ select:focus {
     grid-template-columns: 1fr;
   }
 }
+
+.ai-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 999px;
+  border: 1px solid rgba(247, 251, 248, 0.16);
+  background: rgba(247, 251, 248, 0.06);
+  color: rgba(247, 251, 248, 0.88);
+  padding: 0.35rem 0.75rem;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+}
+
+.ai-chip-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: rgba(247, 251, 248, 0.45);
+}
+
+.ai-chip.is-online {
+  border-color: rgba(63, 138, 120, 0.5);
+}
+
+.ai-chip.is-online .ai-chip-dot {
+  background: #9fd6c4;
+  box-shadow: 0 0 0 3px rgba(63, 138, 120, 0.2);
+}
+
+.ai-chip.is-offline {
+  border-color: rgba(212, 185, 120, 0.45);
+}
+
+.ai-chip.is-offline .ai-chip-dot {
+  background: var(--accent-soft);
+}
+
+.info-banner,
+.success-banner {
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  margin-bottom: 1rem;
+}
+
+.info-banner {
+  background: rgba(247, 251, 248, 0.06);
+  border: 1px solid rgba(247, 251, 248, 0.14);
+  color: rgba(247, 251, 248, 0.86);
+}
+
+.success-banner {
+  background: rgba(63, 138, 120, 0.14);
+  border: 1px solid rgba(63, 138, 120, 0.35);
+  color: #9fd6c4;
+  animation: fade-in 0.3s ease both;
+}
+
+.refine-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.75rem 0 1rem;
+  color: rgba(247, 251, 248, 0.8);
+  font-family: var(--font-ui);
+}
+
+.refine-progress-bar {
+  width: 72px;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--accent-soft), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 1.1s linear infinite;
+}
+
+.compare-col-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
+}
+
+.compare-col-head h3 {
+  margin: 0;
+}
+
+.qa-echo {
+  margin: 0 0 0.65rem;
+  font-size: 0.92rem;
+}
+
+.refine-editor-wrap {
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.refine-editor-wrap .editor-shell {
+  min-height: 240px;
+}
+
+.revision-history-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: end;
+  margin-top: 1.25rem;
+}
+
+.revision-history-head h3 {
+  margin: 0;
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.filter-chip {
+  border-radius: 999px;
+  border: 1px solid rgba(247, 251, 248, 0.14);
+  background: transparent;
+  color: rgba(247, 251, 248, 0.75);
+  padding: 0.25rem 0.65rem;
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  text-transform: lowercase;
+}
+
+.filter-chip.is-active {
+  border-color: rgba(212, 185, 120, 0.55);
+  color: var(--accent-soft);
+  background: rgba(212, 185, 120, 0.12);
+}
+
+.nested-fail {
+  margin-top: 1rem;
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
