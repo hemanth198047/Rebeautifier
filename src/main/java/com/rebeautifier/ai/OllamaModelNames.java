@@ -8,6 +8,8 @@ import java.util.regex.Pattern;
  */
 public final class OllamaModelNames {
 
+    public static final String DEFAULT_OLLAMA_MODEL = "llama3.2:1b";
+
     private static final Pattern CLOUD_API_MODEL = Pattern.compile(
             "^(gpt-|chatgpt-|o[0-9]|o1-|o3-|o4-|claude-|gemini-|text-embedding-|davinci|curie|babbage|ada)",
             Pattern.CASE_INSENSITIVE);
@@ -23,6 +25,19 @@ public final class OllamaModelNames {
         return CLOUD_API_MODEL.matcher(trimmed).find();
     }
 
+    /**
+     * When Local Ollama is selected, cloud/API model ids are invalid — replace with the default Ollama model.
+     */
+    public static String sanitizeForOllama(String model, String fallback) {
+        String defaultModel = fallback == null || fallback.isBlank() || looksLikeCloudApiModel(fallback)
+                ? DEFAULT_OLLAMA_MODEL
+                : fallback.trim();
+        if (model == null || model.isBlank() || looksLikeCloudApiModel(model)) {
+            return defaultModel;
+        }
+        return model.trim();
+    }
+
     public static boolean looksLikeMissingLibraryModel(String registryErr) {
         if (registryErr == null || registryErr.isBlank()) {
             return false;
@@ -36,9 +51,8 @@ public final class OllamaModelNames {
 
     public static String cloudApiModelHint(String model) {
         return "“" + model + "” is an API/cloud model id, not an Ollama library model. "
-                + "In Settings → AI, choose Provider “API key (OpenAI-compatible)”, set your API key, "
-                + "and Save — do not use Pull model. "
-                + "For local Ollama, use a library name such as llama3.2:1b.";
+                + "With Local Ollama selected, use a library name such as " + DEFAULT_OLLAMA_MODEL + ". "
+                + "To use “" + model + "”, switch Provider to “API key (OpenAI-compatible)”, add your API key, and Save — do not use Pull model.";
     }
 
     public static String missingLibraryModelHint(String model) {
@@ -46,7 +60,7 @@ public final class OllamaModelNames {
             return cloudApiModelHint(model);
         }
         return "Ollama has no library model named “" + model + "”. "
-                + "Pick an Ollama model such as llama3.2:1b (see https://ollama.com/library), "
+                + "Pick an Ollama model such as " + DEFAULT_OLLAMA_MODEL + " (see https://ollama.com/library), "
                 + "or switch Provider to “API key (OpenAI-compatible)” for OpenAI-style model ids.";
     }
 }

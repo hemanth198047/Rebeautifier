@@ -59,10 +59,28 @@ export function SettingsPage() {
     setAiSettings(settings)
     setAiEnabled(settings.enabled)
     setAiProvider(settings.provider)
-    setAiModel(settings.model)
-    setAiBaseUrl(settings.baseUrl ?? '')
+    // Local Ollama must not keep leftover API model ids (e.g. gpt-4o-mini).
+    if (settings.provider === 'OLLAMA' && isCloudApiModel(settings.model)) {
+      setAiModel('llama3.2:1b')
+    } else {
+      setAiModel(settings.model)
+    }
+    const base = settings.baseUrl ?? ''
+    if (settings.provider === 'OLLAMA' && /openai\.com/i.test(base)) {
+      setAiBaseUrl('')
+    } else {
+      setAiBaseUrl(base)
+    }
     setAiApiKey('')
     setClearApiKey(false)
+  }
+
+  function isCloudApiModel(model: string) {
+    return /^(gpt-|chatgpt-|o[0-9]|claude-|gemini-|text-embedding-)/i.test(model.trim())
+  }
+
+  function isOllamaLibraryModel(model: string) {
+    return /^(llama|mistral|qwen|phi|gemma|tinyllama|orca|neural|codellama|deepseek)/i.test(model.trim())
   }
 
   async function refreshStatus() {
@@ -134,16 +152,16 @@ export function SettingsPage() {
     setError(null)
     setPullProgress(null)
     const willPull = aiEnabled && aiProvider === 'OLLAMA' && pullOnSave
-    if (willPull && /^(gpt-|chatgpt-|o[0-9]|claude-|gemini-)/i.test(aiModel.trim())) {
-      setError(
-        `“${aiModel}” cannot be pulled into Ollama. Switch Provider to “API key (OpenAI-compatible)” for this model, or change Model to an Ollama name like llama3.2:1b before pulling.`,
-      )
-      return
+    // If Local Ollama still has an API model id in the field, swap to the default before save/pull.
+    const modelToSave =
+      aiProvider === 'OLLAMA' && isCloudApiModel(aiModel) ? 'llama3.2:1b' : aiModel
+    if (modelToSave !== aiModel) {
+      setAiModel(modelToSave)
     }
     setAiBusy(true)
     if (willPull) {
       setPullProgress(
-        `Saving settings, then downloading “${aiModel}” into Ollama. This can take several minutes — leave this page open.`,
+        `Saving settings, then downloading “${modelToSave}” into Ollama. This can take several minutes — leave this page open.`,
       )
     }
     try {
@@ -152,7 +170,7 @@ export function SettingsPage() {
         body: JSON.stringify({
           enabled: aiEnabled,
           provider: aiProvider,
-          model: aiModel,
+          model: modelToSave,
           baseUrl: aiBaseUrl.trim() || null,
           apiKey: aiApiKey.trim() || null,
           clearApiKey,
@@ -182,17 +200,33 @@ export function SettingsPage() {
   }
 
   async function onPullModel() {
-    if (/^(gpt-|chatgpt-|o[0-9]|claude-|gemini-)/i.test(aiModel.trim())) {
-      setError(
-        `“${aiModel}” is an API/cloud model id, not an Ollama library model. Switch Provider to “API key (OpenAI-compatible)”, add your API key, and Save — do not use Pull model. For local Ollama, use a name like llama3.2:1b.`,
-      )
-      return
+    // Heal leftover API model ids so Local Ollama always pulls an Ollama library model.
+    const modelToPull = isCloudApiModel(aiModel) ? 'llama3.2:1b' : aiModel
+    if (modelToPull !== aiModel) {
+      setAiModel(modelToPull)
+      try {
+        await api<AiSettings>('/api/v1/settings/ai', {
+          method: 'PUT',
+          body: JSON.stringify({
+            enabled: true,
+            provider: 'OLLAMA',
+            model: modelToPull,
+            baseUrl: aiBaseUrl.trim() || null,
+            apiKey: null,
+            clearApiKey: false,
+            pullModelOnSave: false,
+          }),
+        })
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : 'Could not reset Ollama model before pull')
+        return
+      }
     }
     setPullBusy(true)
     setAiMsg(null)
     setError(null)
     setPullProgress(
-      `Downloading “${aiModel}” from the Ollama registry into local Ollama storage (Compose volume “ollama”, or ~/.ollama). This can take several minutes on first pull — keep this page open.`,
+      `Downloading “${modelToPull}” from the Ollama registry into local Ollama storage (Compose volume “ollama”, or ~/.ollama). This can take several minutes on first pull — keep this page open.`,
     )
     try {
       const result = await api<AiPullResult>('/api/v1/settings/ai/pull-model', {
@@ -370,8 +404,12 @@ export function SettingsPage() {
                     checked={aiProvider === 'OLLAMA'}
                     onChange={() => {
                       setAiProvider('OLLAMA')
-                      if (!aiModel || /^(gpt-|chatgpt-|o[0-9]|claude-|gemini-)/i.test(aiModel.trim())) {
+                      // Always use an Ollama library model when Local Ollama is selected.
+                      if (!aiModel || isCloudApiModel(aiModel)) {
                         setAiModel('llama3.2:1b')
+                      }
+                      if (/openai\.com/i.test(aiBaseUrl)) {
+                        setAiBaseUrl('')
                       }
                     }}
                   />
@@ -384,7 +422,7 @@ export function SettingsPage() {
                     checked={aiProvider === 'OPENAI_COMPATIBLE'}
                     onChange={() => {
                       setAiProvider('OPENAI_COMPATIBLE')
-                      if (!aiModel || aiModel === 'llama3.2:1b' || /^(llama|mistral|qwen|phi|gemma)/i.test(aiModel.trim())) {
+                      if (!aiModel || aiModel === 'llama3.2:1b' || isOllamaLibraryModel(aiModel)) {
                         setAiModel('gpt-4o-mini')
                       }
                     }}
@@ -406,7 +444,7 @@ export function SettingsPage() {
               </label>
               <p className="muted settings-note">
                 {aiProvider === 'OLLAMA'
-                  ? 'Ollama models look like llama3.2:1b or mistral. Names such as gpt-4o-mini need Provider “API key (OpenAI-compatible)” — they cannot be pulled into Ollama.'
+                  ? 'Local Ollama uses library models such as llama3.2:1b. Switching to Local Ollama clears API model ids like gpt-4o-mini from this field.'
                   : 'Uses your API key against an OpenAI-compatible /chat/completions endpoint. No Ollama pull is needed.'}
               </p>
 

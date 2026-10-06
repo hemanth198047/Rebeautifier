@@ -55,10 +55,19 @@ public class AiSettingsService {
 
         settings.setEnabled(Boolean.TRUE.equals(request.enabled()));
         settings.setProvider(request.provider());
-        settings.setModelName(request.model().trim());
+        String model = request.model().trim();
+        if (request.provider() == AiProvider.OLLAMA) {
+            model = OllamaModelNames.sanitizeForOllama(model, ollamaClient.defaultModel());
+        }
+        settings.setModelName(model);
 
         String baseUrl = request.baseUrl() == null ? null : request.baseUrl().trim();
         if (baseUrl != null && baseUrl.isBlank()) {
+            baseUrl = null;
+        }
+        // Local Ollama should not keep an OpenAI-compatible base URL from a previous provider choice.
+        if (request.provider() == AiProvider.OLLAMA && baseUrl != null
+                && baseUrl.toLowerCase().contains("openai.com")) {
             baseUrl = null;
         }
         settings.setBaseUrl(baseUrl);
@@ -80,7 +89,7 @@ public class AiSettingsService {
         return toResponse(settings, null);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public AiPullResponse pullModelForCurrentUser() {
         User user = authService.requireCurrentUser();
         UserAiSettings settings = repository.findById(user.getId())
@@ -97,14 +106,13 @@ public class AiSettingsService {
         if (settings.getProvider() != AiProvider.OLLAMA) {
             throw ApiException.badRequest("Model pull is only available for the local Ollama provider");
         }
-        AiRuntimeConfig config = resolveConfig(settings);
-        if (OllamaModelNames.looksLikeCloudApiModel(config.model())) {
-            throw new ApiException(
-                    "AI_MODEL_MISMATCH",
-                    OllamaModelNames.cloudApiModelHint(config.model()),
-                    HttpStatus.BAD_REQUEST);
+        // Heal leftover API model ids (e.g. gpt-4o-mini) saved while Local Ollama was selected.
+        if (OllamaModelNames.looksLikeCloudApiModel(settings.getModelName())) {
+            settings.setModelName(OllamaModelNames.sanitizeForOllama(
+                    settings.getModelName(), ollamaClient.defaultModel()));
+            repository.saveAndFlush(settings);
         }
-        return pullModel(config);
+        return pullModel(resolveConfig(settings));
     }
 
     @Transactional(readOnly = true)
@@ -179,8 +187,12 @@ public class AiSettingsService {
         String model = settings.getModelName() == null || settings.getModelName().isBlank()
                 ? ollamaClient.defaultModel()
                 : settings.getModelName().trim();
+        if (provider == AiProvider.OLLAMA) {
+            model = OllamaModelNames.sanitizeForOllama(model, ollamaClient.defaultModel());
+        }
         String baseUrl = settings.getBaseUrl();
-        if (baseUrl == null || baseUrl.isBlank()) {
+        if (baseUrl == null || baseUrl.isBlank()
+                || (provider == AiProvider.OLLAMA && baseUrl.toLowerCase().contains("openai.com"))) {
             baseUrl = provider == AiProvider.OPENAI_COMPATIBLE
                     ? OpenAiCompatibleClient.DEFAULT_BASE_URL
                     : ollamaClient.defaultBaseUrl();
