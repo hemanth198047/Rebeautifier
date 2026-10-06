@@ -32,10 +32,9 @@ Use after a clean install (Compose recommended). Mark each item when verified.
 
 ## Settings / release
 
-- [ ] Settings page shows account, health, AI status, and backup link
-- [ ] README + `SETUP.md` match the one-command and non-Docker paths
-- [ ] `.env.example` documents install knobs
-- [ ] No required cloud accounts for install or AI
+- [ ] JSON backup schema v2 includes cover when present; v1 backups still import
+- [ ] Search returns ranked FTS hits (substring fallback still works)
+- [ ] GitHub Actions CI workflow is present under `.github/workflows/ci.yml`
 
 ## Automated gates
 

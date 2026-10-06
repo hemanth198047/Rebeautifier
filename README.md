@@ -2,7 +2,7 @@
 
 A calm, installable reading library for organizing thoughts as **Book → Chapter → Section → Notes**. Multi-user accounts with Owner / Editor / Viewer membership. Rich-text notes work without AI. Optional local AI refine via **Ollama** (backend-only).
 
-**Version:** 0.1.0 · Full setup: [`SETUP.md`](./SETUP.md) · Acceptance: [`ACCEPTANCE.md`](./ACCEPTANCE.md)
+**Version:** 0.2.0 · Full setup: [`SETUP.md`](./SETUP.md) · Acceptance: [`ACCEPTANCE.md`](./ACCEPTANCE.md)
 
 ## Stack
 
@@ -144,7 +144,7 @@ Then visit http://localhost:8080 → sign in as `reader` / `password123` → ope
 | Notes | list/create under book; get/patch/delete by id; reorder; draft/saved + content_version |
 | AI | `GET /system/ai-status`; note refinements create/list; accept/reject/regenerate |
 | Search | `GET /search?q=` ACL-scoped |
-| Backup | `GET /books/{id}/export?format=json\|markdown`; `POST /books/import` |
+| Backup | `GET /books/{id}/export?format=json\|markdown`; `POST /books/import` (JSON schema v1–v2; v2 includes cover) |
 | Health | `GET /health`, `GET /health/ready` |
 
 Auth uses an HTTP-only session cookie (`REBEAUTIFIER_SESSION`) plus CSRF (`XSRF-TOKEN` cookie / `X-XSRF-TOKEN` header) for mutating requests.
@@ -166,4 +166,4 @@ scripts/smoke-check.sh
 
 ## Phase status
 
-Phase 6 (quality and release readiness) — Compose packaging polish, health/ready probes, Settings, setup + acceptance docs.
+Phase 7 (hardening) — JSON backup covers (schema v2), Postgres full-text search ranking, GitHub Actions CI.

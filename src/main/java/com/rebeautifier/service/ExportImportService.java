@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -42,6 +43,7 @@ public class ExportImportService {
     private final SectionRepository sectionRepository;
     private final NoteRepository noteRepository;
     private final BookService bookService;
+    private final CoverStorageService coverStorageService;
     private final ObjectMapper objectMapper;
 
     public ExportImportService(AuthService authService,
@@ -52,6 +54,7 @@ public class ExportImportService {
                                SectionRepository sectionRepository,
                                NoteRepository noteRepository,
                                BookService bookService,
+                               CoverStorageService coverStorageService,
                                ObjectMapper objectMapper) {
         this.authService = authService;
         this.accessControlService = accessControlService;
@@ -61,6 +64,7 @@ public class ExportImportService {
         this.sectionRepository = sectionRepository;
         this.noteRepository = noteRepository;
         this.bookService = bookService;
+        this.coverStorageService = coverStorageService;
         this.objectMapper = objectMapper;
     }
 
@@ -133,6 +137,8 @@ public class ExportImportService {
         ownerMembership.setRole(BookRole.OWNER);
         bookMemberRepository.save(ownerMembership);
 
+        restoreCover(book, payload);
+
         if (payload.notes() != null) {
             int i = 0;
             for (BookBackupDocument.NotePayload notePayload : payload.notes()) {
@@ -190,9 +196,17 @@ public class ExportImportService {
                         "Invalid backup schema. Expected schema \"" + BookBackupDocument.SCHEMA + "\".",
                         HttpStatus.BAD_REQUEST);
             }
-            if (!root.has("schemaVersion") || root.get("schemaVersion").asInt(-1) != BookBackupDocument.VERSION) {
+            if (!root.has("schemaVersion") || !root.get("schemaVersion").canConvertToInt()) {
                 throw new ApiException("IMPORT_INVALID",
-                        "Unsupported schemaVersion. Expected " + BookBackupDocument.VERSION + ".",
+                        "Unsupported schemaVersion. Expected " + BookBackupDocument.MIN_SUPPORTED_VERSION
+                                + "–" + BookBackupDocument.VERSION + ".",
+                        HttpStatus.BAD_REQUEST);
+            }
+            int version = root.get("schemaVersion").asInt();
+            if (version < BookBackupDocument.MIN_SUPPORTED_VERSION || version > BookBackupDocument.VERSION) {
+                throw new ApiException("IMPORT_INVALID",
+                        "Unsupported schemaVersion. Expected " + BookBackupDocument.MIN_SUPPORTED_VERSION
+                                + "–" + BookBackupDocument.VERSION + ".",
                         HttpStatus.BAD_REQUEST);
             }
             if (!root.has("book") || !root.get("book").isObject()) {
@@ -203,6 +217,7 @@ public class ExportImportService {
                 throw new ApiException("IMPORT_INVALID", "Book title is required.", HttpStatus.BAD_REQUEST);
             }
             validateNotes(document.book().notes(), "book");
+            validateCover(document.book());
             if (document.book().chapters() != null) {
                 for (BookBackupDocument.ChapterPayload chapter : document.book().chapters()) {
                     if (chapter.title() == null || chapter.title().isBlank()) {
@@ -252,6 +267,45 @@ public class ExportImportService {
         }
     }
 
+    private void validateCover(BookBackupDocument.BookPayload book) {
+        String b64 = book.coverBase64();
+        String mime = book.coverMime();
+        if ((b64 == null || b64.isBlank()) && (mime == null || mime.isBlank())) {
+            return;
+        }
+        if (b64 == null || b64.isBlank() || mime == null || mime.isBlank()) {
+            throw new ApiException("IMPORT_INVALID",
+                    "Cover requires both coverMime and coverBase64.", HttpStatus.BAD_REQUEST);
+        }
+        if (!CoverStorageService.isAllowedMime(mime)) {
+            throw new ApiException("IMPORT_INVALID",
+                    "Cover must be JPEG, PNG, WebP, or GIF.", HttpStatus.BAD_REQUEST);
+        }
+        try {
+            byte[] bytes = Base64.getDecoder().decode(b64);
+            if (bytes.length == 0 || bytes.length > CoverStorageService.MAX_BYTES) {
+                throw new ApiException("IMPORT_INVALID",
+                        "Cover payload is empty or exceeds 5MB.", HttpStatus.BAD_REQUEST);
+            }
+        } catch (ApiException ex) {
+            throw ex;
+        } catch (IllegalArgumentException ex) {
+            throw new ApiException("IMPORT_INVALID", "coverBase64 is not valid base64.", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private void restoreCover(Book book, BookBackupDocument.BookPayload payload) {
+        if (payload.coverBase64() == null || payload.coverBase64().isBlank()) {
+            return;
+        }
+        byte[] bytes = Base64.getDecoder().decode(payload.coverBase64());
+        CoverStorageService.StoredCover stored = coverStorageService.storeBytes(
+                book.getId(), payload.coverMime(), bytes);
+        book.setCoverStorageKey(stored.storageKey());
+        book.setCoverMime(stored.mimeType());
+        bookRepository.save(book);
+    }
+
     private BookBackupDocument.BookPayload buildBookPayload(Book book) {
         List<BookBackupDocument.NotePayload> bookNotes = noteRepository
                 .findByBookIdAndAttachTypeOrderByPositionAsc(book.getId(), NoteAttachType.BOOK)
@@ -276,9 +330,21 @@ public class ExportImportService {
                     chapter.getTitle(), chapter.getPosition(), sectionPayloads, chapterNotes));
         }
 
+        String coverMime = null;
+        String coverBase64 = null;
+        if (book.getCoverStorageKey() != null) {
+            var bytes = coverStorageService.readBytes(book.getCoverStorageKey());
+            if (bytes.isPresent()) {
+                coverMime = book.getCoverMime() != null ? book.getCoverMime() : "image/jpeg";
+                coverBase64 = Base64.getEncoder().encodeToString(bytes.get());
+            }
+        }
+
         return new BookBackupDocument.BookPayload(
                 book.getTitle(),
                 book.getDescription(),
+                coverMime,
+                coverBase64,
                 chapterPayloads,
                 bookNotes
         );
