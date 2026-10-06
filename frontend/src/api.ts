@@ -37,6 +37,40 @@ export type Section = {
   updatedAt: string
 }
 
+export type NoteAttachType = 'BOOK' | 'CHAPTER' | 'SECTION'
+export type NoteStatus = 'DRAFT' | 'SAVED'
+
+export type Note = {
+  id: string
+  attachType: NoteAttachType
+  bookId: string
+  chapterId: string | null
+  sectionId: string | null
+  title: string | null
+  bodyRich: string | null
+  bodyOriginal: string | null
+  bodyPlain: string | null
+  status: NoteStatus
+  pageStart: number | null
+  pageEnd: number | null
+  tags: string[]
+  position: number
+  createdById: string
+  createdByDisplayName: string
+  contentVersion: number
+  createdAt: string
+  updatedAt: string
+}
+
+export type Member = {
+  userId: string
+  username: string
+  displayName: string
+  role: BookRole
+  invitedAt: string
+  acceptedAt: string | null
+}
+
 export class ApiError extends Error {
   code: string
   status: number
@@ -96,4 +130,28 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 
   return data as T
+}
+
+export function noteHref(note: Note): string {
+  return `/books/${note.bookId}/notes/${note.id}`
+}
+
+export function formatPageRange(pageStart: number | null, pageEnd: number | null): string | null {
+  if (pageStart == null && pageEnd == null) return null
+  if (pageStart != null && pageEnd != null && pageStart !== pageEnd) {
+    return `pp. ${pageStart}–${pageEnd}`
+  }
+  const page = pageStart ?? pageEnd
+  return page != null ? `p. ${page}` : null
+}
+
+export function formatTimestamp(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date(iso))
+  } catch {
+    return iso
+  }
 }

@@ -53,6 +53,20 @@ public class Note {
     @Column(name = "body_plain", columnDefinition = "TEXT")
     private String bodyPlain;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private NoteStatus status = NoteStatus.DRAFT;
+
+    @Column(name = "page_start")
+    private Integer pageStart;
+
+    @Column(name = "page_end")
+    private Integer pageEnd;
+
+    /** JSON array of tag strings, e.g. ["morning","idea"]. */
+    @Column(columnDefinition = "TEXT")
+    private String tags;
+
     @Column(nullable = false)
     private int position;
 
@@ -149,6 +163,38 @@ public class Note {
         this.bodyPlain = bodyPlain;
     }
 
+    public NoteStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(NoteStatus status) {
+        this.status = status;
+    }
+
+    public Integer getPageStart() {
+        return pageStart;
+    }
+
+    public void setPageStart(Integer pageStart) {
+        this.pageStart = pageStart;
+    }
+
+    public Integer getPageEnd() {
+        return pageEnd;
+    }
+
+    public void setPageEnd(Integer pageEnd) {
+        this.pageEnd = pageEnd;
+    }
+
+    public String getTags() {
+        return tags;
+    }
+
+    public void setTags(String tags) {
+        this.tags = tags;
+    }
+
     public int getPosition() {
         return position;
     }
@@ -167,6 +213,14 @@ public class Note {
 
     public long getContentVersion() {
         return contentVersion;
+    }
+
+    public void setContentVersion(long contentVersion) {
+        this.contentVersion = contentVersion;
+    }
+
+    public void bumpContentVersion() {
+        this.contentVersion += 1;
     }
 
     public Instant getCreatedAt() {

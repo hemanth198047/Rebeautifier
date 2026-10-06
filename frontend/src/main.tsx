@@ -1,13 +1,42 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
-import App from './App'
+import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { AuthProvider } from './auth'
+import { ProtectedRoute } from './ProtectedRoute'
+import { BookPage } from './pages/BookPage'
+import { ChapterPage } from './pages/ChapterPage'
+import { LibraryPage } from './pages/LibraryPage'
+import { LoginPage } from './pages/LoginPage'
+import { NotePage } from './pages/NotePage'
+import { RegisterPage } from './pages/RegisterPage'
+import { SectionPage } from './pages/SectionPage'
+import { Navigate } from 'react-router-dom'
 import './index.css'
+
+const router = createBrowserRouter([
+  { path: '/', element: <Navigate to="/library" replace /> },
+  { path: '/login', element: <LoginPage /> },
+  { path: '/register', element: <RegisterPage /> },
+  {
+    element: <ProtectedRoute />,
+    children: [
+      { path: '/library', element: <LibraryPage /> },
+      { path: '/books/:bookId', element: <BookPage /> },
+      { path: '/books/:bookId/chapters/:chapterId', element: <ChapterPage /> },
+      {
+        path: '/books/:bookId/chapters/:chapterId/sections/:sectionId',
+        element: <SectionPage />,
+      },
+      { path: '/books/:bookId/notes/:noteId', element: <NotePage /> },
+    ],
+  },
+  { path: '*', element: <Navigate to="/library" replace /> },
+])
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>
   </StrictMode>,
 )
