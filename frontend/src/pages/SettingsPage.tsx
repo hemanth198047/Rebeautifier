@@ -152,20 +152,17 @@ export function SettingsPage() {
     setAiMsg(null)
     setError(null)
     setPullProgress(null)
-    const willPull = aiEnabled && aiProvider === 'OLLAMA' && pullOnSave
-    // If Local Ollama still has an API model id in the field, swap to the default before save/pull.
+    const wantPullAfterSave = aiEnabled && aiProvider === 'OLLAMA' && pullOnSave
+    // If Local Ollama still has an API model id in the field, swap to the default before save.
     const modelToSave =
       aiProvider === 'OLLAMA' && isCloudApiModel(aiModel) ? 'llama3.2:1b' : aiModel
     if (modelToSave !== aiModel) {
       setAiModel(modelToSave)
     }
     setAiBusy(true)
-    if (willPull) {
-      setPullProgress(
-        `Saving settings, then downloading “${modelToSave}” into Ollama. This can take several minutes — leave this page open.`,
-      )
-    }
     try {
+      // Never ask the server to pull inside Save — that blocked the request for minutes
+      // and made Save look broken when the registry was slow or unreachable.
       const saved = await api<AiSettings>('/api/v1/settings/ai', {
         method: 'PUT',
         body: JSON.stringify({
@@ -175,28 +172,64 @@ export function SettingsPage() {
           baseUrl: aiBaseUrl.trim() || null,
           apiKey: aiApiKey.trim() || null,
           clearApiKey,
-          pullModelOnSave: willPull,
+          pullModelOnSave: false,
         }),
       })
       applyAiSettingsForm(saved)
       const aiStatus = await api<AiStatus>('/api/v1/system/ai-status')
       setAi(aiStatus)
       notifyAiStatusRefresh()
-      if (saved.pullMessage) {
-        setAiMsg(saved.pullMessage)
-      } else if (saved.enabled) {
+      if (saved.enabled) {
         setAiMsg(
           aiProvider === 'OLLAMA'
-            ? 'AI enabled and saved. Next: click “Pull model now” to download the model into Ollama, then open a note and use Refine.'
+            ? wantPullAfterSave
+              ? 'AI settings saved. Starting model download…'
+              : 'AI settings saved. Next: click “Pull model now” if the model is not installed yet, then open a note and use Refine.'
             : 'AI settings saved — refine will use this API key and model.',
         )
       } else {
         setAiMsg('AI disabled. Notes still work.')
       }
+      setAiBusy(false)
+      if (wantPullAfterSave && saved.enabled) {
+        await runPullModel(modelToSave)
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not save AI settings')
-    } finally {
       setAiBusy(false)
+      setPullProgress(null)
+    }
+  }
+
+  async function runPullModel(modelToPull: string) {
+    setPullBusy(true)
+    setError(null)
+    setPullProgress(
+      `Downloading “${modelToPull}” from the Ollama registry into local Ollama storage (Compose volume “ollama”, or ~/.ollama). This can take several minutes on first pull — keep this page open.`,
+    )
+    try {
+      const result = await api<AiPullResult>('/api/v1/settings/ai/pull-model', {
+        method: 'POST',
+        body: '{}',
+      })
+      const aiStatus = await api<AiStatus>('/api/v1/system/ai-status')
+      setAi(aiStatus)
+      notifyAiStatusRefresh()
+      const parts = [result.message, result.storageHint, result.nextStep].filter(Boolean)
+      if (aiStatus.available) {
+        setAiMsg(parts.join(' '))
+      } else {
+        // Settings stay saved — show guidance without treating Save as failed.
+        setAiMsg(
+          parts.join(' ') ||
+            aiStatus.message ||
+            'Download finished contacting Ollama, but the model is not online yet. Check Model name, then Refresh status.',
+        )
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not pull model')
+    } finally {
+      setPullBusy(false)
       setPullProgress(null)
     }
   }
@@ -224,33 +257,8 @@ export function SettingsPage() {
         return
       }
     }
-    setPullBusy(true)
     setAiMsg(null)
-    setError(null)
-    setPullProgress(
-      `Downloading “${modelToPull}” from the Ollama registry into local Ollama storage (Compose volume “ollama”, or ~/.ollama). This can take several minutes on first pull — keep this page open.`,
-    )
-    try {
-      const result = await api<AiPullResult>('/api/v1/settings/ai/pull-model', {
-        method: 'POST',
-        body: '{}',
-      })
-      const aiStatus = await api<AiStatus>('/api/v1/system/ai-status')
-      setAi(aiStatus)
-      notifyAiStatusRefresh()
-      const parts = [result.message, result.storageHint, result.nextStep].filter(Boolean)
-      setAiMsg(parts.join(' '))
-      if (!aiStatus.available) {
-        setError(
-          aiStatus.message ||
-            'Pull completed but AI is not online yet. Confirm the Model name matches an installed Ollama model, then click Refresh status.',
-        )
-      }    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not pull model')
-    } finally {
-      setPullBusy(false)
-      setPullProgress(null)
-    }
+    await runPullModel(modelToPull)
   }
 
   return (
@@ -516,13 +524,13 @@ export function SettingsPage() {
                     onChange={(e) => setPullOnSave(e.target.checked)}
                     disabled={!aiEnabled}
                   />
-                  <span>Also pull model while saving (can take several minutes)</span>
+                  <span>Also pull model after saving (runs separately — Save itself stays fast)</span>
                 </label>
               )}
 
               <div className="settings-actions">
                 <button className="btn btn-primary" type="submit" disabled={aiBusy || pullBusy}>
-                  {aiBusy ? (pullOnSave && aiEnabled ? 'Saving & downloading…' : 'Saving…') : 'Save AI settings'}
+                  {aiBusy ? 'Saving…' : 'Save AI settings'}
                 </button>
                 {aiEnabled && aiProvider === 'OLLAMA' && (
                   <button
