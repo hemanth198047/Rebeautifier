@@ -24,21 +24,26 @@ export function AiStatusChip({ compact = false }: Props) {
   }, [])
 
   const online = !!status?.available
+  const disabled = status != null && status.enabled === false
   const label = !status
     ? 'AI…'
-    : online
+    : disabled
       ? compact
-        ? 'AI on'
-        : `AI · ${status.model}`
-      : compact
         ? 'AI off'
-        : 'AI offline'
+        : 'AI disabled'
+      : online
+        ? compact
+          ? 'AI on'
+          : `AI · ${status.model}`
+        : compact
+          ? 'AI off'
+          : 'AI offline'
 
   return (
     <button
       type="button"
       className={`ai-chip ${online ? 'is-online' : 'is-offline'}`}
-      title={status?.message ?? 'Checking Ollama'}
+      title={status?.message ?? 'Checking AI status'}
       onClick={() => void refresh()}
     >
       <span className="ai-chip-dot" aria-hidden />

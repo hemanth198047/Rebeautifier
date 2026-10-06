@@ -11,7 +11,7 @@ public class WelcomeService {
 
     private final String appVersion;
 
-    public WelcomeService(@Value("${rebeautifier.app-version:0.6.0}") String appVersion) {
+    public WelcomeService(@Value("${rebeautifier.app-version:0.7.0}") String appVersion) {
         this.appVersion = appVersion;
     }
 

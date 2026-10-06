@@ -3,6 +3,7 @@ package com.rebeautifier.ai;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.rebeautifier.domain.AiProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,8 +22,8 @@ public class OllamaClient {
 
     private static final Logger log = LoggerFactory.getLogger(OllamaClient.class);
 
-    private final String baseUrl;
-    private final String model;
+    private final String defaultBaseUrl;
+    private final String defaultModel;
     private final Duration timeout;
     private final boolean mockEnabled;
     private final ObjectMapper objectMapper;
@@ -33,8 +34,8 @@ public class OllamaClient {
                         @Value("${rebeautifier.ollama.timeout-seconds:90}") long timeoutSeconds,
                         @Value("${rebeautifier.ollama.mock-enabled:false}") boolean mockEnabled,
                         ObjectMapper objectMapper) {
-        this.baseUrl = trimTrailingSlash(baseUrl);
-        this.model = model;
+        this.defaultBaseUrl = trimTrailingSlash(baseUrl);
+        this.defaultModel = model;
         this.timeout = Duration.ofSeconds(timeoutSeconds);
         this.mockEnabled = mockEnabled;
         this.objectMapper = objectMapper;
@@ -43,22 +44,39 @@ public class OllamaClient {
                 .build();
     }
 
+    public boolean mockEnabled() {
+        return mockEnabled;
+    }
+
+    public String defaultModel() {
+        return defaultModel;
+    }
+
+    public String defaultBaseUrl() {
+        return defaultBaseUrl;
+    }
+
+    /** @deprecated prefer defaultModel() — kept for existing callers during migration */
     public String configuredModel() {
-        return model;
+        return defaultModel;
     }
 
     public String baseUrl() {
-        return baseUrl;
+        return defaultBaseUrl;
     }
 
     public AiStatusProbe probe() {
+        return probe(defaultConfig());
+    }
+
+    public AiStatusProbe probe(AiRuntimeConfig config) {
         if (mockEnabled) {
-            return new AiStatusProbe(true, true, "Mock Ollama enabled for tests", 1L, List.of(model));
+            return new AiStatusProbe(true, true, "Mock Ollama enabled for tests", 1L, List.of(config.model()));
         }
         long started = System.currentTimeMillis();
         try {
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(baseUrl + "/api/tags"))
+                    .uri(URI.create(config.baseUrl() + "/api/tags"))
                     .timeout(Duration.ofSeconds(4))
                     .GET()
                     .build();
@@ -78,14 +96,11 @@ public class OllamaClient {
                     }
                 }
             }
-            boolean hasModel = models.stream().anyMatch(n -> n.equals(model) || n.startsWith(model + ":") || model.startsWith(n.split(":")[0]));
-            // Also match exact tag contained in list (e.g. llama3.2:1b)
-            if (!hasModel) {
-                hasModel = models.stream().anyMatch(n -> n.equals(model) || n.startsWith(model));
-            }
+            boolean hasModel = models.stream().anyMatch(n ->
+                    n.equals(config.model()) || n.startsWith(config.model() + ":") || n.startsWith(config.model()));
             String message = hasModel
                     ? "Ollama reachable; model available"
-                    : "Ollama reachable but model '" + model + "' not pulled yet";
+                    : "Ollama reachable but model '" + config.model() + "' not pulled yet";
             return new AiStatusProbe(true, hasModel, message, latency, models);
         } catch (Exception ex) {
             long latency = System.currentTimeMillis() - started;
@@ -95,12 +110,16 @@ public class OllamaClient {
     }
 
     public String generate(String systemPrompt, String userPrompt) throws OllamaException {
+        return generate(defaultConfig(), systemPrompt, userPrompt);
+    }
+
+    public String generate(AiRuntimeConfig config, String systemPrompt, String userPrompt) throws OllamaException {
         if (mockEnabled) {
             return "<p><strong>Mock refine</strong></p><p>" + escapeForMock(userPrompt) + "</p>";
         }
         try {
             ObjectNode body = objectMapper.createObjectNode();
-            body.put("model", model);
+            body.put("model", config.model());
             body.put("stream", false);
             body.put("system", systemPrompt);
             body.put("prompt", userPrompt);
@@ -109,7 +128,7 @@ public class OllamaClient {
             options.put("num_predict", 2048);
 
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(baseUrl + "/api/generate"))
+                    .uri(URI.create(config.baseUrl() + "/api/generate"))
                     .timeout(timeout)
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
@@ -130,6 +149,37 @@ public class OllamaClient {
         } catch (Exception ex) {
             throw new OllamaException("Ollama generate failed: " + shortMessage(ex), ex);
         }
+    }
+
+    public PullResult pullModel(AiRuntimeConfig config) throws OllamaException {
+        if (mockEnabled) {
+            return new PullResult(true, "Mock pull succeeded for " + config.model());
+        }
+        try {
+            ObjectNode body = objectMapper.createObjectNode();
+            body.put("name", config.model());
+            body.put("stream", false);
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(config.baseUrl() + "/api/pull"))
+                    .timeout(Duration.ofMinutes(20))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new OllamaException("Ollama pull failed with HTTP " + response.statusCode()
+                        + (response.body() != null && !response.body().isBlank() ? ": " + truncate(response.body(), 200) : ""));
+            }
+            return new PullResult(true, "Pulled model " + config.model());
+        } catch (OllamaException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new OllamaException("Ollama pull failed: " + shortMessage(ex), ex);
+        }
+    }
+
+    public AiRuntimeConfig defaultConfig() {
+        return new AiRuntimeConfig(AiProvider.OLLAMA, defaultBaseUrl, defaultModel, null);
     }
 
     private static String trimTrailingSlash(String url) {
@@ -158,11 +208,14 @@ public class OllamaClient {
         if (msg == null || msg.isBlank()) {
             msg = root.getClass().getSimpleName();
         }
-        // Prefer concise type for common java.net failures (avoid "ConnectException" alone in UI).
         if ("ConnectException".equals(msg) || "Connection refused".equalsIgnoreCase(msg)) {
             return "connection refused";
         }
         return msg.length() > 180 ? msg.substring(0, 180) + "…" : msg;
+    }
+
+    private static String truncate(String value, int max) {
+        return value.length() <= max ? value : value.substring(0, max) + "…";
     }
 
     private static String escapeForMock(String input) {
@@ -188,6 +241,9 @@ public class OllamaClient {
         public static AiStatusProbe unavailable(String message, long latencyMs, List<String> models) {
             return new AiStatusProbe(false, false, message, latencyMs, models);
         }
+    }
+
+    public record PullResult(boolean success, String message) {
     }
 
     public static class OllamaException extends Exception {

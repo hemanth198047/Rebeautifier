@@ -46,7 +46,7 @@ public class RefinementService {
     private final NoteRevisionRepository noteRevisionRepository;
     private final AccessControlService accessControlService;
     private final AuthService authService;
-    private final OllamaClient ollamaClient;
+    private final AiSettingsService aiSettingsService;
     private final AiConcurrencyGate concurrencyGate;
     private final ObjectMapper objectMapper;
     private final NoteService noteService;
@@ -57,7 +57,7 @@ public class RefinementService {
                              NoteRevisionRepository noteRevisionRepository,
                              AccessControlService accessControlService,
                              AuthService authService,
-                             OllamaClient ollamaClient,
+                             AiSettingsService aiSettingsService,
                              AiConcurrencyGate concurrencyGate,
                              ObjectMapper objectMapper,
                              NoteService noteService,
@@ -67,7 +67,7 @@ public class RefinementService {
         this.noteRevisionRepository = noteRevisionRepository;
         this.accessControlService = accessControlService;
         this.authService = authService;
-        this.ollamaClient = ollamaClient;
+        this.aiSettingsService = aiSettingsService;
         this.concurrencyGate = concurrencyGate;
         this.objectMapper = objectMapper;
         this.noteService = noteService;
@@ -77,21 +77,45 @@ public class RefinementService {
 
     @Transactional(readOnly = true)
     public AiStatusResponse status() {
-        // auth required by security config for /system/**
-        authService.requireCurrentUser();
-        OllamaClient.AiStatusProbe probe = ollamaClient.probe();
+        AiSettingsService.ResolvedAi resolved = aiSettingsService.resolveForCurrentUser();
+        if (!resolved.enabled()) {
+            AiMetrics.Snapshot metrics = aiMetrics.snapshot();
+            return new AiStatusResponse(
+                    false,
+                    false,
+                    resolved.provider().name(),
+                    false,
+                    false,
+                    resolved.config().model(),
+                    resolved.config().baseUrl(),
+                    "AI is disabled in Settings",
+                    0L,
+                    concurrencyGate.inFlight(),
+                    concurrencyGate.maxConcurrent(),
+                    List.of(),
+                    "Open Settings → AI, enable AI, choose Ollama or an API key provider, then Save.",
+                    metrics.attempts(),
+                    metrics.succeeded(),
+                    metrics.failed(),
+                    metrics.averageLatencyMs()
+            );
+        }
+
+        OllamaClient.AiStatusProbe probe = aiSettingsService.probe(resolved);
         boolean available = probe.reachable() && probe.modelAvailable();
-        String setup = "Start with AI enabled (`./start.sh --ai --pull-model` or `start.bat --ai --pull-model`), "
-                + "or install Ollama from https://ollama.com and run `ollama pull "
-                + ollamaClient.configuredModel()
-                + "`. Set OLLAMA_BASE_URL if Ollama is not on the default host. Notes still work while AI is offline.";
+        String setup = resolved.provider() == com.rebeautifier.domain.AiProvider.OLLAMA
+                ? "In Settings → AI, click Pull model (or Save with pull enabled). Ensure Ollama is reachable at "
+                + resolved.config().baseUrl() + "."
+                : "Check your API key, base URL, and model name in Settings → AI.";
         AiMetrics.Snapshot metrics = aiMetrics.snapshot();
         return new AiStatusResponse(
                 available,
+                true,
+                resolved.provider().name(),
                 probe.reachable(),
                 probe.modelAvailable(),
-                ollamaClient.configuredModel(),
-                ollamaClient.baseUrl(),
+                resolved.config().model(),
+                resolved.config().baseUrl(),
                 probe.message(),
                 probe.latencyMs(),
                 concurrencyGate.inFlight(),
@@ -145,15 +169,24 @@ public class RefinementService {
             throw ApiException.badRequest("Note is too large to refine (max " + MAX_INPUT_CHARS + " characters of plain text)");
         }
 
-        OllamaClient.AiStatusProbe probe = ollamaClient.probe();
+        AiSettingsService.ResolvedAi resolved = aiSettingsService.resolveForCurrentUser();
+        if (!resolved.enabled()) {
+            throw new ApiException(
+                    "AI_DISABLED",
+                    "AI is disabled. Enable it in Settings → AI. Notes still work without AI.",
+                    HttpStatus.SERVICE_UNAVAILABLE
+            );
+        }
+
+        OllamaClient.AiStatusProbe probe = aiSettingsService.probe(resolved);
         if (!probe.reachable()) {
             throw new ApiException("AI_UNAVAILABLE", probe.message() + " Notes still work without AI.", HttpStatus.SERVICE_UNAVAILABLE);
         }
         if (!probe.modelAvailable()) {
             throw new ApiException(
                     "AI_UNAVAILABLE",
-                    "Ollama is reachable but model '" + ollamaClient.configuredModel()
-                            + "' is not available. Pull it, then retry. Notes still work without AI.",
+                    "AI provider is reachable but model '" + resolved.config().model()
+                            + "' is not available. Pull or configure it in Settings → AI. Notes still work without AI.",
                     HttpStatus.SERVICE_UNAVAILABLE
             );
         }
@@ -165,7 +198,7 @@ public class RefinementService {
         revision.setInputHash(hash(source));
         revision.setCreatedBy(user);
         revision.setStatus(RevisionStatus.PENDING);
-        revision.setModelName(ollamaClient.configuredModel());
+        revision.setModelName(resolved.config().model());
         revision.setPromptMeta(serializePromptMeta(request));
 
         noteRevisionRepository.saveAndFlush(revision);
@@ -174,7 +207,7 @@ public class RefinementService {
         try (AiConcurrencyGate.Permit ignored = concurrencyGate.acquire()) {
             String system = systemPrompt(request.mode());
             String userPrompt = userPrompt(request.mode(), source, plain, request.question());
-            String raw = ollamaClient.generate(system, userPrompt);
+            String raw = aiSettingsService.generate(resolved, system, userPrompt);
             String rich = toRichHtml(raw);
             revision.setResultRich(rich);
             revision.setResultPlain(toPlain(rich));

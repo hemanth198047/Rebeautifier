@@ -1,6 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { api, ApiError, type AiStatus, type RateLimitStatus, type User } from '../api'
+import {
+  api,
+  ApiError,
+  type AiProvider,
+  type AiSettings,
+  type AiStatus,
+  type RateLimitStatus,
+  type User,
+} from '../api'
 import { useAuth } from '../auth'
 import { AiStatusChip } from '../components/AiStatusChip'
 
@@ -17,32 +25,57 @@ type Ready = Health & {
 export function SettingsPage() {
   const { user, logout, setUser } = useAuth()
   const [ai, setAi] = useState<AiStatus | null>(null)
+  const [aiSettings, setAiSettings] = useState<AiSettings | null>(null)
   const [limits, setLimits] = useState<RateLimitStatus | null>(null)
   const [health, setHealth] = useState<Health | null>(null)
   const [ready, setReady] = useState<Ready | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [passwordMsg, setPasswordMsg] = useState<string | null>(null)
   const [profileMsg, setProfileMsg] = useState<string | null>(null)
+  const [aiMsg, setAiMsg] = useState<string | null>(null)
   const [displayName, setDisplayName] = useState(user?.displayName ?? '')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [passwordBusy, setPasswordBusy] = useState(false)
   const [profileBusy, setProfileBusy] = useState(false)
+  const [aiBusy, setAiBusy] = useState(false)
+  const [pullBusy, setPullBusy] = useState(false)
+
+  const [aiEnabled, setAiEnabled] = useState(false)
+  const [aiProvider, setAiProvider] = useState<AiProvider>('OLLAMA')
+  const [aiModel, setAiModel] = useState('llama3.2:1b')
+  const [aiBaseUrl, setAiBaseUrl] = useState('')
+  const [aiApiKey, setAiApiKey] = useState('')
+  const [clearApiKey, setClearApiKey] = useState(false)
+  const [pullOnSave, setPullOnSave] = useState(true)
 
   useEffect(() => {
     setDisplayName(user?.displayName ?? '')
   }, [user?.displayName])
 
+  function applyAiSettingsForm(settings: AiSettings) {
+    setAiSettings(settings)
+    setAiEnabled(settings.enabled)
+    setAiProvider(settings.provider)
+    setAiModel(settings.model)
+    setAiBaseUrl(settings.baseUrl ?? '')
+    setAiApiKey('')
+    setClearApiKey(false)
+    setPullOnSave(settings.provider === 'OLLAMA')
+  }
+
   async function refreshStatus() {
     setError(null)
     try {
-      const [aiStatus, limitStatus, healthStatus, readyStatus] = await Promise.all([
+      const [aiStatus, settings, limitStatus, healthStatus, readyStatus] = await Promise.all([
         api<AiStatus>('/api/v1/system/ai-status'),
+        api<AiSettings>('/api/v1/settings/ai'),
         api<RateLimitStatus>('/api/v1/system/rate-limits'),
         fetch('/api/v1/health').then(async (r) => (await r.json()) as Health),
         fetch('/api/v1/health/ready').then(async (r) => (await r.json()) as Ready),
       ])
       setAi(aiStatus)
+      applyAiSettingsForm(settings)
       setLimits(limitStatus)
       setHealth(healthStatus)
       setReady(readyStatus)
@@ -94,6 +127,60 @@ export function SettingsPage() {
     }
   }
 
+  async function onSaveAi(event: FormEvent) {
+    event.preventDefault()
+    setAiBusy(true)
+    setAiMsg(null)
+    setError(null)
+    try {
+      const saved = await api<AiSettings>('/api/v1/settings/ai', {
+        method: 'PUT',
+        body: JSON.stringify({
+          enabled: aiEnabled,
+          provider: aiProvider,
+          model: aiModel,
+          baseUrl: aiBaseUrl.trim() || null,
+          apiKey: aiApiKey.trim() || null,
+          clearApiKey,
+          pullModelOnSave: aiEnabled && aiProvider === 'OLLAMA' && pullOnSave,
+        }),
+      })
+      applyAiSettingsForm(saved)
+      const aiStatus = await api<AiStatus>('/api/v1/system/ai-status')
+      setAi(aiStatus)
+      setAiMsg(
+        saved.pullMessage
+          ? `Saved. ${saved.pullMessage}`
+          : saved.enabled
+            ? 'AI settings saved — refine will use this configuration.'
+            : 'AI disabled. Notes still work.',
+      )
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not save AI settings')
+    } finally {
+      setAiBusy(false)
+    }
+  }
+
+  async function onPullModel() {
+    setPullBusy(true)
+    setAiMsg(null)
+    setError(null)
+    try {
+      const result = await api<{ success: boolean; message: string; modelAvailable: boolean }>(
+        '/api/v1/settings/ai/pull-model',
+        { method: 'POST', body: '{}' },
+      )
+      const aiStatus = await api<AiStatus>('/api/v1/system/ai-status')
+      setAi(aiStatus)
+      setAiMsg(result.message + (result.modelAvailable ? ' Model is ready.' : ''))
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not pull model')
+    } finally {
+      setPullBusy(false)
+    }
+  }
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -118,11 +205,11 @@ export function SettingsPage() {
         </div>
       </header>
 
-      <main className="page settings-page">
+      <main className="page">
         <div className="library-header">
           <div>
+            <p className="muted">Account</p>
             <h1>Settings</h1>
-            <p className="muted">Account, install health, and local AI setup — all stay on this host.</p>
           </div>
           <button className="btn btn-ghost" type="button" onClick={() => void refreshStatus()}>
             Refresh status
@@ -132,43 +219,37 @@ export function SettingsPage() {
         {error && <div className="error-banner">{error}</div>}
         {profileMsg && <div className="success-banner">{profileMsg}</div>}
         {passwordMsg && <div className="success-banner">{passwordMsg}</div>}
+        {aiMsg && <div className="success-banner">{aiMsg}</div>}
 
-        <section className="settings-grid">
+        <div className="settings-grid">
           <article className="settings-panel">
-            <h2>Account</h2>
-            <dl className="settings-dl">
-              <div>
-                <dt>Username</dt>
-                <dd>{user?.username}</dd>
-              </div>
-              <div>
-                <dt>Email</dt>
-                <dd>{user?.email}</dd>
-              </div>
-            </dl>
-            <form className="form-stack password-form" onSubmit={(e) => void onSaveProfile(e)}>
-              <h3>Display name</h3>
+            <h2>Profile</h2>
+            <form className="form-stack" onSubmit={onSaveProfile}>
               <label>
-                How you appear to collaborators
-                <input
-                  type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  required
-                  maxLength={120}
-                />
+                Username
+                <input value={user?.username ?? ''} disabled />
+              </label>
+              <label>
+                Email
+                <input value={user?.email ?? ''} disabled />
+              </label>
+              <label>
+                Display name
+                <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} required maxLength={120} />
               </label>
               <button className="btn btn-primary" type="submit" disabled={profileBusy}>
-                {profileBusy ? 'Saving…' : 'Save display name'}
+                {profileBusy ? 'Saving…' : 'Save profile'}
               </button>
             </form>
-            <form className="form-stack password-form" onSubmit={(e) => void onChangePassword(e)}>
-              <h3>Change password</h3>
+          </article>
+
+          <article className="settings-panel">
+            <h2>Password</h2>
+            <form className="form-stack" onSubmit={onChangePassword}>
               <label>
                 Current password
                 <input
                   type="password"
-                  autoComplete="current-password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   required
@@ -179,7 +260,6 @@ export function SettingsPage() {
                 New password
                 <input
                   type="password"
-                  autoComplete="new-password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   required
@@ -187,12 +267,9 @@ export function SettingsPage() {
                 />
               </label>
               <button className="btn btn-primary" type="submit" disabled={passwordBusy}>
-                {passwordBusy ? 'Updating…' : 'Update password'}
+                {passwordBusy ? 'Updating…' : 'Change password'}
               </button>
             </form>
-            <p className="muted settings-note">
-              Accounts are local to this installation. There is no cloud login.
-            </p>
           </article>
 
           <article className="settings-panel">
@@ -200,28 +277,13 @@ export function SettingsPage() {
             <dl className="settings-dl">
               <div>
                 <dt>Service</dt>
-                <dd>
-                  <span className={`status-pill ${health?.status === 'UP' ? 'is-up' : 'is-down'}`}>
-                    {health?.status ?? '…'}
-                  </span>
-                </dd>
+                <dd>{health ? `${health.status} · ${health.version ?? ''}` : '—'}</dd>
               </div>
               <div>
                 <dt>Database</dt>
-                <dd>
-                  <span className={`status-pill ${ready?.database === 'UP' ? 'is-up' : 'is-down'}`}>
-                    {ready?.database ?? '…'}
-                  </span>
-                </dd>
-              </div>
-              <div>
-                <dt>Version</dt>
-                <dd>{health?.version ?? ready?.version ?? '—'}</dd>
+                <dd>{ready?.database ?? '—'}</dd>
               </div>
             </dl>
-            <p className="muted settings-note">
-              Orchestrators can probe <code>/api/v1/health</code> and <code>/api/v1/health/ready</code>.
-            </p>
           </article>
 
           <article className="settings-panel">
@@ -252,14 +314,143 @@ export function SettingsPage() {
           </article>
 
           <article className="settings-panel settings-panel-wide">
-            <h2>Local AI (Ollama)</h2>
+            <h2>AI</h2>
+            <p className="muted panel-sub">
+              Enable or disable AI here. Choose local Ollama (pull the model from this screen) or paste an API key for
+              any OpenAI-compatible provider. No CLI steps required for day-to-day use.
+            </p>
             <div className="ai-status-block">
               <AiStatusChip />
-              <p className="muted">{ai?.message ?? 'Checking Ollama…'}</p>
+              <p className="muted">{ai?.message ?? 'Checking AI…'}</p>
             </div>
-            <dl className="settings-dl">
+
+            <form className="form-stack" onSubmit={onSaveAi}>
+              <label className="checkbox-row">
+                <input type="checkbox" checked={aiEnabled} onChange={(e) => setAiEnabled(e.target.checked)} />
+                <span>Enable AI for my account</span>
+              </label>
+
+              <fieldset className="provider-fieldset" disabled={!aiEnabled}>
+                <legend>Provider</legend>
+                <label className="checkbox-row">
+                  <input
+                    type="radio"
+                    name="ai-provider"
+                    checked={aiProvider === 'OLLAMA'}
+                    onChange={() => {
+                      setAiProvider('OLLAMA')
+                      setPullOnSave(true)
+                      if (!aiModel) setAiModel('llama3.2:1b')
+                    }}
+                  />
+                  <span>Local Ollama</span>
+                </label>
+                <label className="checkbox-row">
+                  <input
+                    type="radio"
+                    name="ai-provider"
+                    checked={aiProvider === 'OPENAI_COMPATIBLE'}
+                    onChange={() => {
+                      setAiProvider('OPENAI_COMPATIBLE')
+                      setPullOnSave(false)
+                      if (aiModel === 'llama3.2:1b') setAiModel('gpt-4o-mini')
+                    }}
+                  />
+                  <span>API key (OpenAI-compatible)</span>
+                </label>
+              </fieldset>
+
+              <label>
+                Model
+                <input
+                  value={aiModel}
+                  onChange={(e) => setAiModel(e.target.value)}
+                  required
+                  maxLength={200}
+                  disabled={!aiEnabled}
+                  placeholder={aiProvider === 'OLLAMA' ? 'llama3.2:1b' : 'gpt-4o-mini'}
+                />
+              </label>
+
+              <label>
+                Base URL{' '}
+                {aiProvider === 'OLLAMA'
+                  ? '(optional — defaults to install Ollama URL)'
+                  : '(optional — defaults to https://api.openai.com/v1)'}
+                <input
+                  value={aiBaseUrl}
+                  onChange={(e) => setAiBaseUrl(e.target.value)}
+                  disabled={!aiEnabled}
+                  placeholder={aiProvider === 'OLLAMA' ? 'http://ollama:11434' : 'https://api.openai.com/v1'}
+                />
+              </label>
+
+              {aiProvider === 'OPENAI_COMPATIBLE' && (
+                <>
+                  <label>
+                    API key
+                    <input
+                      type="password"
+                      value={aiApiKey}
+                      onChange={(e) => {
+                        setAiApiKey(e.target.value)
+                        setClearApiKey(false)
+                      }}
+                      disabled={!aiEnabled}
+                      placeholder={aiSettings?.apiKeyConfigured ? `Saved ${aiSettings.apiKeyHint}` : 'sk-…'}
+                      autoComplete="off"
+                    />
+                  </label>
+                  {aiSettings?.apiKeyConfigured && (
+                    <label className="checkbox-row">
+                      <input
+                        type="checkbox"
+                        checked={clearApiKey}
+                        onChange={(e) => setClearApiKey(e.target.checked)}
+                        disabled={!aiEnabled}
+                      />
+                      <span>Clear saved API key</span>
+                    </label>
+                  )}
+                </>
+              )}
+
+              {aiProvider === 'OLLAMA' && (
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={pullOnSave}
+                    onChange={(e) => setPullOnSave(e.target.checked)}
+                    disabled={!aiEnabled}
+                  />
+                  <span>Pull model when saving (if Ollama is reachable)</span>
+                </label>
+              )}
+
+              <div className="settings-actions">
+                <button className="btn btn-primary" type="submit" disabled={aiBusy}>
+                  {aiBusy ? 'Saving…' : 'Save AI settings'}
+                </button>
+                {aiEnabled && aiProvider === 'OLLAMA' && (
+                  <button
+                    className="btn btn-ghost"
+                    type="button"
+                    disabled={pullBusy || aiBusy}
+                    onClick={() => void onPullModel()}
+                  >
+                    {pullBusy ? 'Pulling model…' : 'Pull model now'}
+                  </button>
+                )}
+              </div>
+            </form>
+
+            <dl className="settings-dl" style={{ marginTop: '1.25rem' }}>
               <div>
-                <dt>Model</dt>
+                <dt>Provider</dt>
+                <dd>{ai?.provider ?? aiSettings?.provider ?? '—'}</dd>
+              </div>
+              <div>
+                <dt>Active model</dt>
                 <dd>{ai?.model ?? '—'}</dd>
               </div>
               <div>
@@ -273,51 +464,15 @@ export function SettingsPage() {
                 <dd>{ai ? `${ai.inFlight} in flight / max ${ai.maxConcurrent}` : '—'}</dd>
               </div>
               <div>
-                <dt>Models seen</dt>
-                <dd>{ai?.models?.length ? ai.models.join(', ') : 'none detected'}</dd>
-              </div>
-              <div>
                 <dt>Refine attempts</dt>
                 <dd>{ai?.metricsAttempts ?? 0}</dd>
               </div>
               <div>
                 <dt>Succeeded / failed</dt>
-                <dd>
-                  {ai ? `${ai.metricsSucceeded} / ${ai.metricsFailed}` : '—'}
-                </dd>
-              </div>
-              <div>
-                <dt>Avg refine latency</dt>
-                <dd>{ai ? `${ai.metricsAverageLatencyMs} ms` : '—'}</dd>
+                <dd>{ai ? `${ai.metricsSucceeded} / ${ai.metricsFailed}` : '—'}</dd>
               </div>
             </dl>
-            {ai && !ai.available && (
-              <div className="setup-hint">
-                <h3>Setup steps</h3>
-                <ol>
-                  <li>
-                    Start with AI: <code>./start.sh --ai --pull-model</code> (Windows:{' '}
-                    <code>start.bat --ai --pull-model</code>)
-                  </li>
-                  <li>
-                    Or manually: <code>docker compose --profile ai up --build</code>, then{' '}
-                    <code>docker compose --profile ai exec ollama ollama pull llama3.2:1b</code>
-                  </li>
-                  <li>
-                    Or install Ollama from{' '}
-                    <a href="https://ollama.com" target="_blank" rel="noreferrer">
-                      ollama.com
-                    </a>{' '}
-                    and set <code>OLLAMA_BASE_URL</code> / <code>OLLAMA_MODEL</code> in <code>.env</code>.
-                  </li>
-                </ol>
-                {ai.setupHint && <p className="muted">{ai.setupHint}</p>}
-                <p className="muted">
-                  Notes keep working while AI is offline. On ~4&nbsp;GB RAM hosts, keep concurrency at 1 and prefer
-                  small models such as <code>llama3.2:1b</code>.
-                </p>
-              </div>
-            )}
+            {ai?.setupHint && !ai.available && <p className="muted settings-note">{ai.setupHint}</p>}
           </article>
 
           <article className="settings-panel settings-panel-wide">
@@ -327,15 +482,12 @@ export function SettingsPage() {
               covers volume — see <code>SETUP.md</code> and the acceptance checklist.
             </p>
             <div className="settings-actions">
-              <Link className="btn" to="/backup">
-                Open Backup
-              </Link>
-              <Link className="btn btn-ghost" to="/library">
-                Back to library
+              <Link className="btn btn-secondary" to="/backup">
+                Open backup
               </Link>
             </div>
           </article>
-        </section>
+        </div>
       </main>
     </div>
   )

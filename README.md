@@ -2,7 +2,7 @@
 
 A calm, installable reading library for organizing thoughts as **Book → Chapter → Section → Notes**. Multi-user accounts with Owner / Editor / Viewer membership. Rich-text notes work without AI. Optional local AI refine via **Ollama** (backend-only).
 
-**Version:** 0.6.0 · Full setup: [`SETUP.md`](./SETUP.md) · Acceptance: [`ACCEPTANCE.md`](./ACCEPTANCE.md)
+**Version:** 0.7.0 · Full setup: [`SETUP.md`](./SETUP.md) · Acceptance: [`ACCEPTANCE.md`](./ACCEPTANCE.md)
 
 ## Stack
 
