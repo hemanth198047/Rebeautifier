@@ -1,6 +1,41 @@
 spring:
   application:
     name: rebeautifier
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/rebeautifier}
+    username: ${DATABASE_USERNAME:rebeautifier}
+    password: ${DATABASE_PASSWORD:rebeautifier}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+  session:
+    cookie:
+      name: REBEAUTIFIER_SESSION
+      http-only: true
+      same-site: lax
+      secure: false
 
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: never
+
+rebeautifier:
+  cors-origins: ${CORS_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+  cover-storage-path: ${COVER_STORAGE_PATH:./data/covers}
+  seed-demo-data: ${SEED_DEMO_DATA:true}
+
+logging:
+  level:
+    org.springframework.security: INFO

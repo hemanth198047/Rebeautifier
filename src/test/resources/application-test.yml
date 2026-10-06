@@ -1,0 +1,11 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/rebeautifier_test
+    username: rebeautifier
+    password: rebeautifier
+  jpa:
+    hibernate:
+      ddl-auto: validate
+rebeautifier:
+  seed-demo-data: false
+  cover-storage-path: ${java.io.tmpdir}/rebeautifier-test-covers
