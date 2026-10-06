@@ -431,6 +431,82 @@ class ApiIntegrationTest {
 
     @Test
     @Order(8)
+    void sharedEditorCanRefineButViewerCannot() throws Exception {
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        MvcResult editorRegister = mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username":"ed_%s",
+                                  "email":"ed_%s@example.com",
+                                  "password":"password123",
+                                  "displayName":"Shared Editor"
+                                }
+                                """.formatted(suffix, suffix)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        MockHttpSession editorSession = (MockHttpSession) editorRegister.getRequest().getSession(false);
+
+        MvcResult viewerRegister = mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username":"vw_%s",
+                                  "email":"vw_%s@example.com",
+                                  "password":"password123",
+                                  "displayName":"Shared Viewer"
+                                }
+                                """.formatted(suffix, suffix)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        MockHttpSession viewerSession = (MockHttpSession) viewerRegister.getRequest().getSession(false);
+
+        mockMvc.perform(post("/api/v1/books/" + bookId + "/members")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"usernameOrEmail":"ed_%s","role":"EDITOR"}
+                                """.formatted(suffix)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/v1/books/" + bookId + "/members")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"usernameOrEmail":"vw_%s","role":"VIEWER"}
+                                """.formatted(suffix)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/v1/notes/" + noteIdForAi + "/refinements").session(editorSession))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/notes/" + noteIdForAi + "/refinements")
+                        .session(editorSession)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"mode":"GRAMMAR"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("SUCCEEDED"));
+
+        mockMvc.perform(get("/api/v1/notes/" + noteIdForAi + "/refinements").session(viewerSession))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/notes/" + noteIdForAi + "/refinements")
+                        .session(viewerSession)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"mode":"SUMMARY"}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @Order(9)
     void logoutClearsSession() throws Exception {
         mockMvc.perform(post("/api/v1/auth/logout").session(session).with(csrf()))
                 .andExpect(status().isNoContent());

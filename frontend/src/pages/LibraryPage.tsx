@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError, type Book } from '../api'
 import { useAuth } from '../auth'
+import { AiStatusChip } from '../components/AiStatusChip'
 
 export function LibraryPage() {
   const { user, logout } = useAuth()
@@ -50,6 +51,7 @@ export function LibraryPage() {
           Rebeautifier<span>.</span>
         </div>
         <div className="topbar-actions">
+          <AiStatusChip />
           <span className="muted">{user?.displayName}</span>
           <button className="btn btn-ghost" type="button" onClick={() => void logout()}>
             Sign out
