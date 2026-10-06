@@ -216,6 +216,7 @@ export function RefinePanel({
   }
 
   const aiOffline = aiStatus && !aiStatus.available
+  const needsModel = !!aiStatus?.enabled && !!aiStatus?.reachable && !aiStatus?.modelAvailable
   const busyLabel =
     phase === 'saving' ? 'Saving note…' : phase === 'refining' ? 'Refining…' : phase === 'applying' ? 'Applying…' : 'Working…'
 
@@ -232,7 +233,15 @@ export function RefinePanel({
       <div className={`ai-status-banner ${aiStatus?.available ? 'is-online' : 'is-offline'}`}>
         {aiStatus ? (
           <>
-            <strong>{aiStatus.available ? 'AI online' : aiStatus.enabled === false ? 'AI disabled — notes still work' : 'AI offline — notes still work'}</strong>
+            <strong>
+              {aiStatus.available
+                ? 'AI online'
+                : aiStatus.enabled === false
+                  ? 'AI disabled — notes still work'
+                  : needsModel
+                    ? 'AI needs a model — notes still work'
+                    : 'AI offline — notes still work'}
+            </strong>
             <span>{aiStatus.message}</span>
             <span className="muted">
               Model {aiStatus.model} · queue {aiStatus.inFlight}/{aiStatus.maxConcurrent}

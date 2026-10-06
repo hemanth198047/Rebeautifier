@@ -103,10 +103,22 @@ public class RefinementService {
 
         OllamaClient.AiStatusProbe probe = aiSettingsService.probe(resolved);
         boolean available = probe.reachable() && probe.modelAvailable();
-        String setup = resolved.provider() == com.rebeautifier.domain.AiProvider.OLLAMA
-                ? "In Settings → AI, click Pull model (or Save with pull enabled). Ensure Ollama is reachable at "
-                + resolved.config().baseUrl() + "."
-                : "Check your API key, base URL, and model name in Settings → AI.";
+        String setup;
+        if (resolved.provider() == com.rebeautifier.domain.AiProvider.OLLAMA) {
+            if (probe.reachable() && !probe.modelAvailable()) {
+                setup = probe.models().isEmpty()
+                        ? "Ollama is running, but no model is installed yet. In Settings → AI, click Pull model for "
+                        + resolved.config().model() + "."
+                        : "Ollama is running. Configured model is '" + resolved.config().model()
+                        + "' but installed models are: " + String.join(", ", probe.models())
+                        + ". Set Model to a listed name (or pull the configured one), then Save and Refresh status.";
+            } else {
+                setup = "In Settings → AI, click Pull model (or Save with pull enabled). Ensure Ollama is reachable at "
+                        + resolved.config().baseUrl() + ".";
+            }
+        } else {
+            setup = "Check your API key, base URL, and model name in Settings → AI.";
+        }
         AiMetrics.Snapshot metrics = aiMetrics.snapshot();
         return new AiStatusResponse(
                 available,

@@ -11,7 +11,7 @@ import {
   type User,
 } from '../api'
 import { useAuth } from '../auth'
-import { AiStatusChip } from '../components/AiStatusChip'
+import { AiStatusChip, notifyAiStatusRefresh } from '../components/AiStatusChip'
 
 type Health = {
   status: string
@@ -95,6 +95,7 @@ export function SettingsPage() {
       ])
       setAi(aiStatus)
       applyAiSettingsForm(settings)
+      notifyAiStatusRefresh()
       setLimits(limitStatus)
       setHealth(healthStatus)
       setReady(readyStatus)
@@ -180,6 +181,7 @@ export function SettingsPage() {
       applyAiSettingsForm(saved)
       const aiStatus = await api<AiStatus>('/api/v1/system/ai-status')
       setAi(aiStatus)
+      notifyAiStatusRefresh()
       if (saved.pullMessage) {
         setAiMsg(saved.pullMessage)
       } else if (saved.enabled) {
@@ -235,9 +237,15 @@ export function SettingsPage() {
       })
       const aiStatus = await api<AiStatus>('/api/v1/system/ai-status')
       setAi(aiStatus)
+      notifyAiStatusRefresh()
       const parts = [result.message, result.storageHint, result.nextStep].filter(Boolean)
       setAiMsg(parts.join(' '))
-    } catch (err) {
+      if (!aiStatus.available) {
+        setError(
+          aiStatus.message ||
+            'Pull completed but AI is not online yet. Confirm the Model name matches an installed Ollama model, then click Refresh status.',
+        )
+      }    } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not pull model')
     } finally {
       setPullBusy(false)
@@ -385,7 +393,7 @@ export function SettingsPage() {
               chip says AI online, open a note and use Refine. Notes always work with AI off.
             </p>
             <div className="ai-status-block">
-              <AiStatusChip />
+              <AiStatusChip statusOverride={ai} />
               <p className="muted">{ai?.message ?? 'Checking AI…'}</p>
             </div>
 
@@ -539,8 +547,11 @@ export function SettingsPage() {
               )}
               {ai?.enabled && aiProvider === 'OLLAMA' && !ai.available && (
                 <p className="muted settings-note">
-                  AI is enabled but the model is not ready yet. Use Pull model now, wait for the download to finish,
-                  then Refresh status. Models are stored by Ollama (Compose volume <code>ollama</code>).
+                  {ai.reachable
+                    ? ai.models && ai.models.length > 0
+                      ? `Ollama is up. Configured model “${ai.model}” is not installed. Installed: ${ai.models.join(', ')}. Change Model to a listed name (or Pull again), Save, then Refresh status.`
+                      : `Ollama is up but no models are installed yet. Click Pull model now for “${ai.model}”, wait until it finishes, then Refresh status.`
+                    : 'Ollama is not reachable. Restart with ./start.sh (or start.bat), confirm Base URL, then Refresh status.'}
                 </p>
               )}
             </form>
