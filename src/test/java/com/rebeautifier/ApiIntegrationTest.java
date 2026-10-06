@@ -345,16 +345,16 @@ class ApiIntegrationTest {
                                 {"enabled":true,"provider":"OLLAMA","model":"gpt-4o-mini","baseUrl":null,"apiKey":null,"clearApiKey":false,"pullModelOnSave":false}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.model").value("gpt-4o-mini"));
+                // Local Ollama must not keep an API model id — sanitize to the default Ollama model.
+                .andExpect(jsonPath("$.model").value("llama3.2:1b"));
 
         mockMvc.perform(post("/api/v1/settings/ai/pull-model")
                         .session(session)
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("AI_MODEL_MISMATCH"))
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("API key")));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
 
         mockMvc.perform(put("/api/v1/settings/ai")
                         .session(session)

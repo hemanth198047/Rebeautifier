@@ -2,6 +2,7 @@ package com.rebeautifier.ai;
 
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -29,10 +30,9 @@ class OllamaModelNamesTest {
     }
 
     @Test
-    void cloudHintMentionsApiKeyProvider() {
-        String hint = OllamaModelNames.cloudApiModelHint("gpt-4o-mini");
-        assertTrue(hint.contains("gpt-4o-mini"));
-        assertTrue(hint.contains("API key"));
-        assertTrue(hint.contains("llama3.2:1b"));
+    void sanitizeForOllamaReplacesCloudIds() {
+        assertEquals("llama3.2:1b", OllamaModelNames.sanitizeForOllama("gpt-4o-mini", "llama3.2:1b"));
+        assertEquals("llama3.2:1b", OllamaModelNames.sanitizeForOllama("GPT-4o", null));
+        assertEquals("mistral", OllamaModelNames.sanitizeForOllama("mistral", "llama3.2:1b"));
     }
 }
