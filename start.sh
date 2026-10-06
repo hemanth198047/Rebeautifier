@@ -116,10 +116,17 @@ if [[ "$PULL_MODEL" -eq 1 ]]; then
   MODEL="$(grep -E '^[[:space:]]*OLLAMA_MODEL=' .env 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d '\r' || true)"
   MODEL="${MODEL:-llama3.2:1b}"
   echo "Pulling Ollama model ${MODEL} (may take a while)..."
-  "${COMPOSE[@]}" "${FILE_ARGS[@]}" exec -T ollama ollama pull "$MODEL" || {
-    echo "Model pull failed; AI will show offline until the model is available." >&2
-    echo "You can also pull from Settings → AI after signing in." >&2
-  }
+  if ! "${COMPOSE[@]}" "${FILE_ARGS[@]}" exec -T ollama ollama pull "$MODEL"; then
+    echo "Compose exec pull failed; retrying via host network into the ollama volume..." >&2
+    VOL="$("${COMPOSE[@]}" "${FILE_ARGS[@]}" volume ls -q | grep -E 'ollama$' | head -n1 || true)"
+    if [[ -n "$VOL" ]] && docker run --rm --network host -e GODEBUG=netdns=go -v "${VOL}:/root/.ollama" ollama/ollama pull "$MODEL"; then
+      echo "Model pulled via host-network fallback."
+    else
+      echo "Model pull failed; AI will show offline until the model is available." >&2
+      echo "Ollama itself is fine — the container needs outbound HTTPS to registry.ollama.ai." >&2
+      echo "You can also pull from Settings → AI after signing in once registry access works." >&2
+    fi
+  fi
 fi
 
 STOP_EXTRA=""

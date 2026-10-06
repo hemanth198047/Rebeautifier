@@ -179,17 +179,19 @@ public class OllamaClient {
                     .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                String responseBody = response.body() == null ? "" : response.body();
+                String registryErr = extractRegistryError(responseBody);
+                if (registryErr != null) {
+                    throw new OllamaException(registryFailureMessage(baseUrl, registryErr));
+                }
                 throw new OllamaException("Ollama pull failed with HTTP " + response.statusCode()
-                        + (response.body() != null && !response.body().isBlank() ? ": " + truncate(response.body(), 200) : ""));
+                        + (responseBody.isBlank() ? "" : ": " + truncate(responseBody, 200)));
             }
             // Ollama may return 200 with an error payload when registry DNS/network fails.
             if (response.body() != null && response.body().toLowerCase().contains("error")) {
-                JsonNode root = objectMapper.readTree(response.body());
-                String err = root.path("error").asText(null);
-                if (err != null && !err.isBlank()) {
-                    throw new OllamaException("Ollama could not download the model: " + truncate(err, 240)
-                            + " The Ollama service is reachable at " + baseUrl
-                            + ", but it could not fetch from the model registry. Check outbound internet from the ollama container.");
+                String registryErr = extractRegistryError(response.body());
+                if (registryErr != null) {
+                    throw new OllamaException(registryFailureMessage(baseUrl, registryErr));
                 }
             }
             return new PullResult(true, "Pulled model " + config.model() + " via " + baseUrl);
@@ -239,6 +241,35 @@ public class OllamaClient {
 
     private static String truncate(String value, int max) {
         return value.length() <= max ? value : value.substring(0, max) + "…";
+    }
+
+    private String extractRegistryError(String body) {
+        if (body == null || body.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(body);
+            String err = root.path("error").asText(null);
+            if (err != null && !err.isBlank()) {
+                return err;
+            }
+        } catch (Exception ignored) {
+            // fall through
+        }
+        String lower = body.toLowerCase();
+        if (lower.contains("registry.ollama.ai") || lower.contains("pull model manifest")
+                || lower.contains("i/o timeout") || lower.contains("dial tcp")) {
+            return truncate(body, 240);
+        }
+        return null;
+    }
+
+    private static String registryFailureMessage(String baseUrl, String registryErr) {
+        return "Ollama is reachable at " + baseUrl
+                + " but could not download from the model registry (registry.ollama.ai). "
+                + "Detail: " + truncate(registryErr, 200)
+                + " Ensure the ollama container has outbound HTTPS, or pull on the host with "
+                + "`docker compose exec ollama ollama pull <model>` / `./start.sh --pull-model`, then retry.";
     }
 
     private static String escapeForMock(String input) {

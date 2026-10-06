@@ -13,6 +13,17 @@ services:
   ollama:
     ports:
       - "11434:11434"
+    # Nested Docker often blocks container egress; clear proxies and prefer IPv4 for registry pulls.
+    environment:
+      http_proxy: ""
+      https_proxy: ""
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      ALL_PROXY: ""
+      all_proxy: ""
+      no_proxy: "*"
+      NO_PROXY: "*"
+      GODEBUG: "netdns=go"
 
   api:
     extra_hosts:
