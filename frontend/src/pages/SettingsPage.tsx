@@ -11,6 +11,7 @@ import {
   type User,
 } from '../api'
 import { useAuth } from '../auth'
+import { AppShell, PageHeader } from '../components/AppShell'
 import { AiStatusChip, notifyAiStatusRefresh } from '../components/AiStatusChip'
 
 type Health = {
@@ -24,7 +25,7 @@ type Ready = Health & {
 }
 
 export function SettingsPage() {
-  const { user, logout, setUser } = useAuth()
+  const { user, setUser } = useAuth()
   const [ai, setAi] = useState<AiStatus | null>(null)
   const [aiSettings, setAiSettings] = useState<AiSettings | null>(null)
   const [limits, setLimits] = useState<RateLimitStatus | null>(null)
@@ -271,39 +272,24 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <Link className="brand" to="/library">
-          Rebeautifier<span>.</span>
-        </Link>
-        <div className="topbar-actions">
-          <Link className="btn btn-ghost" to="/library">
-            Library
-          </Link>
-          <Link className="btn btn-ghost" to="/search">
-            Search
-          </Link>
-          <Link className="btn btn-ghost" to="/backup">
-            Backup
-          </Link>
-          <AiStatusChip />
-          <span className="muted">{user?.displayName}</span>
-          <button className="btn btn-ghost" type="button" onClick={() => void logout()}>
-            Sign out
-          </button>
-        </div>
-      </header>
-
-      <main className="page">
-        <div className="library-header">
-          <div>
-            <p className="muted">Account</p>
-            <h1>Settings</h1>
-          </div>
-          <button className="btn btn-ghost" type="button" onClick={() => void refreshStatus()}>
-            Refresh status
-          </button>
-        </div>
+    <AppShell active="settings" compactAi={false}>
+      <main className="page page-dense settings-page">
+        <PageHeader
+          eyebrow="Account"
+          title="Settings"
+          subtitle="Profile, password, AI provider, rate limits, and install health for this deployment."
+          actions={
+            <button className="btn btn-ghost" type="button" onClick={() => void refreshStatus()}>
+              Refresh status
+            </button>
+          }
+          meta={[
+            { label: 'AI', value: ai?.available ? 'Online' : ai ? 'Offline' : '…' },
+            { label: 'Database', value: ready?.database ?? '…' },
+            { label: 'Version', value: health?.version ?? '…' },
+            { label: 'User', value: user?.username ?? '…' },
+          ]}
+        />
 
         {error && <div className="error-banner">{error}</div>}
         {profileMsg && <div className="success-banner">{profileMsg}</div>}
@@ -633,6 +619,6 @@ export function SettingsPage() {
           </article>
         </div>
       </main>
-    </div>
+    </AppShell>
   )
 }

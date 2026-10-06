@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, ApiError, type SearchResponse } from '../api'
-import { useAuth } from '../auth'
-import { AiStatusChip } from '../components/AiStatusChip'
+import { AppShell, PageHeader } from '../components/AppShell'
 
 export function SearchPage() {
-  const { user, logout } = useAuth()
   const [params, setParams] = useSearchParams()
   const initial = params.get('q') ?? ''
   const [query, setQuery] = useState(initial)
@@ -56,49 +54,42 @@ export function SearchPage() {
     void runSearch(query)
   }
 
+  const hitCount = result?.hits.length ?? 0
+
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <Link to="/library" className="brand">
-          Rebeautifier<span>.</span>
-        </Link>
-        <div className="topbar-actions">
-          <Link className="btn btn-ghost" to="/library">
-            Library
-          </Link>
-          <Link className="btn btn-ghost" to="/backup">
-            Backup
-          </Link>
-          <Link className="btn btn-ghost" to="/settings">
-            Settings
-          </Link>
-          <AiStatusChip compact />
-          <span className="muted">{user?.displayName}</span>
-          <button className="btn btn-ghost" type="button" onClick={() => void logout()}>
-            Sign out
-          </button>
-        </div>
-      </header>
+    <AppShell active="search">
+      <main className="page page-dense">
+        <PageHeader
+          eyebrow="Discovery"
+          title="Search"
+          subtitle="Find books, chapters, sections, and notes you can access across this install."
+          actions={
+            <Link className="btn btn-ghost" to="/library">
+              Back to library
+            </Link>
+          }
+          meta={[
+            { label: 'Results', value: result ? hitCount : '—' },
+            { label: 'Books', value: result ? grouped.BOOK.length : '—' },
+            { label: 'Chapters', value: result ? grouped.CHAPTER.length : '—' },
+            { label: 'Notes', value: result ? grouped.NOTE.length : '—' },
+          ]}
+        />
 
-      <main className="page">
-        <div className="library-header">
-          <div>
-            <h1>Search</h1>
-            <p className="muted">Find books, chapters, sections, and notes you can access.</p>
-          </div>
-        </div>
-
-        <form className="search-form" onSubmit={onSubmit}>
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search titles and note text…"
-            autoFocus
-          />
-          <button className="btn btn-primary" type="submit" disabled={loading}>
-            {loading ? 'Searching…' : 'Search'}
-          </button>
-        </form>
+        <section className="dense-panel search-panel">
+          <form className="search-form" onSubmit={onSubmit}>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search titles and note text…"
+              autoFocus
+            />
+            <button className="btn btn-primary" type="submit" disabled={loading}>
+              {loading ? 'Searching…' : 'Search'}
+            </button>
+          </form>
+          <p className="muted panel-sub">Minimum 2 characters. Results respect book membership ACL.</p>
+        </section>
 
         {error && <div className="error-banner">{error}</div>}
 
@@ -112,8 +103,13 @@ export function SearchPage() {
               const hits = grouped[type]
               if (hits.length === 0) return null
               return (
-                <section key={type} className="detail-panel">
-                  <h2>{type.charAt(0) + type.slice(1).toLowerCase()}s</h2>
+                <section key={type} className="detail-panel dense-panel">
+                  <div className="panel-heading">
+                    <h2>
+                      {type.charAt(0) + type.slice(1).toLowerCase()}s
+                      <span className="muted panel-count"> · {hits.length}</span>
+                    </h2>
+                  </div>
                   <ul className="list">
                     {hits.map((hit) => (
                       <li key={`${hit.type}-${hit.id}`} className="list-item">
@@ -138,6 +134,6 @@ export function SearchPage() {
           </div>
         )}
       </main>
-    </div>
+    </AppShell>
   )
 }

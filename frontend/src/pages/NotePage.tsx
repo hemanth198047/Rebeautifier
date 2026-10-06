@@ -9,18 +9,16 @@ import {
   type Note,
   type NoteStatus,
 } from '../api'
-import { useAuth } from '../auth'
 import { useDialog } from '../components/DialogProvider'
+import { AppShell } from '../components/AppShell'
 import { RichTextEditor } from '../components/RichTextEditor'
 import { RefinePanel } from '../components/RefinePanel'
-import { AiStatusChip } from '../components/AiStatusChip'
 
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'failed'
 
 export function NotePage() {
   const { bookId = '', noteId = '' } = useParams()
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
   const { confirm } = useDialog()
 
   const [book, setBook] = useState<Book | null>(null)
@@ -235,22 +233,11 @@ export function NotePage() {
               : 'Up to date'
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <Link to="/library" className="brand">
-          Rebeautifier<span>.</span>
-        </Link>
-        <div className="topbar-actions">
-          <span className={`save-indicator save-${saveState}`}>{saveLabel}</span>
-          <AiStatusChip compact />
-          <span className="muted">{user?.displayName}</span>
-          <button className="btn btn-ghost" type="button" onClick={() => void logout()}>
-            Sign out
-          </button>
-        </div>
-      </header>
-
-      <main className="page note-page">
+    <AppShell
+      active="book"
+      trailing={<span className={`save-indicator save-${saveState}`}>{saveLabel}</span>}
+    >
+      <main className="page note-page page-dense">
         <nav className="breadcrumb">
           <Link to="/library">Library</Link>
           <span>/</span>
@@ -278,7 +265,7 @@ export function NotePage() {
           </div>
         )}
 
-        <section className="detail-panel note-editor-panel">
+        <section className="detail-panel note-editor-panel dense-panel">
           <div className="note-editor-header">
             <input
               className="note-title-input"
@@ -446,6 +433,6 @@ export function NotePage() {
           />
         )}
       </main>
-    </div>
+    </AppShell>
   )
 }

@@ -1,12 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api, ApiError, type Book, type Chapter, type Note, type Section } from '../api'
-import { useAuth } from '../auth'
+import { AppShell } from '../components/AppShell'
 import { NotesPanel } from '../components/NotesPanel'
 
 export function ChapterPage() {
   const { bookId = '', chapterId = '' } = useParams()
-  const { user, logout } = useAuth()
   const [book, setBook] = useState<Book | null>(null)
   const [chapter, setChapter] = useState<Chapter | null>(null)
   const [sections, setSections] = useState<Section[]>([])
@@ -88,20 +87,8 @@ export function ChapterPage() {
   }
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <Link to="/library" className="brand">
-          Rebeautifier<span>.</span>
-        </Link>
-        <div className="topbar-actions">
-          <span className="muted">{user?.displayName}</span>
-          <button className="btn btn-ghost" type="button" onClick={() => void logout()}>
-            Sign out
-          </button>
-        </div>
-      </header>
-
-      <main className="page">
+    <AppShell active="book">
+      <main className="page page-dense">
         <nav className="breadcrumb">
           <Link to="/library">Library</Link>
           <span>/</span>
@@ -112,71 +99,95 @@ export function ChapterPage() {
 
         {error && <div className="error-banner">{error}</div>}
 
-        <section className="detail-panel">
-          <h1>{chapter?.title ?? 'Chapter'}</h1>
-          <p className="muted">Sections nest beneath this chapter. Capture chapter-level notes below.</p>
-        </section>
-
-        <section className="detail-panel">
-          <div className="panel-heading">
-            <h2>Sections</h2>
-            {canEdit && <p className="muted panel-sub">Drag to reorder, or use the arrows.</p>}
+        <section className="detail-panel dense-panel">
+          <p className="page-eyebrow">Chapter</p>
+          <div className="book-title-row">
+            <h1>{chapter?.title ?? 'Chapter'}</h1>
+            {book && (
+              <span className={`role-pill role-${book.myRole.toLowerCase()}`}>{book.myRole.toLowerCase()}</span>
+            )}
           </div>
-          {sections.length === 0 ? (
-            <div className="empty-state">No sections yet.</div>
-          ) : (
-            <ul className="list">
-              {sections.map((section, index) => (
-                <li
-                  key={section.id}
-                  className={`list-item ${dragSectionId === section.id ? 'is-dragging' : ''}`}
-                  draggable={canEdit}
-                  onDragStart={() => setDragSectionId(section.id)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => void onDropSection(section.id)}
-                >
-                  <Link to={`/books/${bookId}/chapters/${chapterId}/sections/${section.id}`}>
-                    <strong>{section.title}</strong>
-                  </Link>
-                  {canEdit && (
-                    <div className="reorder-controls">
-                      <button className="btn btn-ghost" type="button" onClick={() => void moveSection(index, -1)}>
-                        ↑
-                      </button>
-                      <button className="btn btn-ghost" type="button" onClick={() => void moveSection(index, 1)}>
-                        ↓
-                      </button>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {canEdit && (
-            <form className="inline-form" onSubmit={onCreateSection}>
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="New section title"
-                required
-              />
-              <button className="btn btn-primary" type="submit">
-                Add section
-              </button>
-            </form>
-          )}
+          <p className="muted">
+            Sections nest beneath this chapter. Capture chapter-level notes below — originals stay intact when you save.
+          </p>
+          <dl className="page-meta-strip">
+            <div>
+              <dt>Sections</dt>
+              <dd>{sections.length}</dd>
+            </div>
+            <div>
+              <dt>Notes here</dt>
+              <dd>{notes.length}</dd>
+            </div>
+            <div>
+              <dt>Book</dt>
+              <dd>{book?.title ?? '—'}</dd>
+            </div>
+          </dl>
         </section>
 
-        <NotesPanel
-          bookId={bookId}
-          attachType="CHAPTER"
-          chapterId={chapterId}
-          canEdit={!!canEdit}
-          notes={notes}
-          onChanged={load}
-        />
+        <div className="workspace-split">
+          <section className="detail-panel dense-panel">
+            <div className="panel-heading">
+              <h2>Sections</h2>
+              {canEdit && <p className="muted panel-sub">Drag to reorder, or use the arrows.</p>}
+            </div>
+            {sections.length === 0 ? (
+              <div className="empty-state">No sections yet.</div>
+            ) : (
+              <ul className="list">
+                {sections.map((section, index) => (
+                  <li
+                    key={section.id}
+                    className={`list-item ${dragSectionId === section.id ? 'is-dragging' : ''}`}
+                    draggable={canEdit}
+                    onDragStart={() => setDragSectionId(section.id)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => void onDropSection(section.id)}
+                  >
+                    <Link to={`/books/${bookId}/chapters/${chapterId}/sections/${section.id}`}>
+                      <strong>{section.title}</strong>
+                    </Link>
+                    {canEdit && (
+                      <div className="reorder-controls">
+                        <button className="btn btn-ghost" type="button" onClick={() => void moveSection(index, -1)}>
+                          ↑
+                        </button>
+                        <button className="btn btn-ghost" type="button" onClick={() => void moveSection(index, 1)}>
+                          ↓
+                        </button>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {canEdit && (
+              <form className="inline-form" onSubmit={onCreateSection}>
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="New section title"
+                  required
+                />
+                <button className="btn btn-primary" type="submit">
+                  Add section
+                </button>
+              </form>
+            )}
+          </section>
+
+          <NotesPanel
+            bookId={bookId}
+            attachType="CHAPTER"
+            chapterId={chapterId}
+            canEdit={!!canEdit}
+            notes={notes}
+            onChanged={load}
+          />
+        </div>
       </main>
-    </div>
+    </AppShell>
   )
 }

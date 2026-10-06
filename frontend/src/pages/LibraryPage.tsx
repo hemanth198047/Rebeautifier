@@ -1,16 +1,16 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { api, ApiError, type Book } from '../api'
-import { useAuth } from '../auth'
-import { AiStatusChip } from '../components/AiStatusChip'
+import { api, ApiError, formatTimestamp, type Book } from '../api'
+import { AppShell, PageHeader } from '../components/AppShell'
 
 export function LibraryPage() {
-  const { user, logout } = useAuth()
   const [books, setBooks] = useState<Book[]>([])
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState<'ALL' | 'OWNER' | 'EDITOR' | 'VIEWER'>('ALL')
+  const [query, setQuery] = useState('')
 
   async function load() {
     setLoading(true)
@@ -29,6 +29,26 @@ export function LibraryPage() {
     void load()
   }, [])
 
+  const stats = useMemo(() => {
+    const owned = books.filter((b) => b.myRole === 'OWNER').length
+    const shared = books.filter((b) => b.myRole !== 'OWNER').length
+    const withCover = books.filter((b) => !!b.coverUrl).length
+    return { total: books.length, owned, shared, withCover }
+  }, [books])
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return books.filter((book) => {
+      if (filter !== 'ALL' && book.myRole !== filter) return false
+      if (!q) return true
+      return (
+        book.title.toLowerCase().includes(q) ||
+        (book.description ?? '').toLowerCase().includes(q) ||
+        book.ownerDisplayName.toLowerCase().includes(q)
+      )
+    })
+  }, [books, filter, query])
+
   async function onCreate(event: FormEvent) {
     event.preventDefault()
     try {
@@ -45,87 +65,142 @@ export function LibraryPage() {
   }
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <div className="brand">
-          Rebeautifier<span>.</span>
-        </div>
-        <div className="topbar-actions">
-          <Link className="btn btn-ghost" to="/search">
-            Search
-          </Link>
-          <Link className="btn btn-ghost" to="/backup">
-            Backup
-          </Link>
-          <Link className="btn btn-ghost" to="/settings">
-            Settings
-          </Link>
-          <AiStatusChip />
-          <span className="muted">{user?.displayName}</span>
-          <button className="btn btn-ghost" type="button" onClick={() => void logout()}>
-            Sign out
-          </button>
-        </div>
-      </header>
-
-      <main className="page">
-        <div className="library-header">
-          <div>
-            <h1>Your library</h1>
-            <p className="muted">Books you own or share — open one to wander its chapters.</p>
-          </div>
-        </div>
+    <AppShell active="library" compactAi={false}>
+      <main className="page page-dense">
+        <PageHeader
+          eyebrow="Workspace"
+          title="Your library"
+          subtitle="Books you own or share — open one to wander its chapters, capture notes, and refine when ready."
+          actions={
+            <>
+              <Link className="btn btn-ghost" to="/search">
+                Search notes
+              </Link>
+              <Link className="btn btn-ghost" to="/backup">
+                Backup
+              </Link>
+              <a className="btn btn-primary" href="#start-book">
+                Start a book
+              </a>
+            </>
+          }
+          meta={[
+            { label: 'Books', value: stats.total },
+            { label: 'Owned', value: stats.owned },
+            { label: 'Shared with you', value: stats.shared },
+            { label: 'With covers', value: stats.withCover },
+          ]}
+        />
 
         {error && <div className="error-banner">{error}</div>}
 
-        <section className="create-panel">
-          <h2>Start a book</h2>
-          <form className="form-stack" onSubmit={onCreate}>
-            <label>
-              Title
-              <input value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} />
-            </label>
-            <label>
-              Description
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                maxLength={5000}
-              />
-            </label>
-            <button className="btn btn-primary" type="submit">
-              Create book
-            </button>
-          </form>
-        </section>
+        <div className="library-layout">
+          <aside className="library-sidebar">
+            <section id="start-book" className="create-panel dense-panel">
+              <div className="panel-heading">
+                <h2>Start a book</h2>
+                <p className="muted panel-sub">Title required. Description and cover can wait.</p>
+              </div>
+              <form className="form-stack" onSubmit={onCreate}>
+                <label>
+                  Title
+                  <input value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} />
+                </label>
+                <label>
+                  Description
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={4}
+                    maxLength={5000}
+                    placeholder="What belongs on this shelf?"
+                  />
+                </label>
+                <button className="btn btn-primary" type="submit">
+                  Create book
+                </button>
+              </form>
+            </section>
 
-        {loading ? (
-          <p className="muted">Opening shelves…</p>
-        ) : books.length === 0 ? (
-          <div className="empty-state">No books yet. Create one above to begin.</div>
-        ) : (
-          <div className="book-grid">
-            {books.map((book, index) => (
-              <Link
-                key={book.id}
-                to={`/books/${book.id}`}
-                className="book-tile"
-                style={{ animationDelay: `${index * 0.05}s` }}
-              >
-                {book.coverUrl ? (
-                  <img className="book-cover" src={book.coverUrl} alt="" />
-                ) : (
-                  <div className="book-cover" aria-hidden />
-                )}
-                <h2>{book.title}</h2>
-                <p>{book.description || 'No description yet.'}</p>
-                <div className="role-tag">{book.myRole.toLowerCase()}</div>
-              </Link>
-            ))}
-          </div>
-        )}
+            <section className="dense-panel library-tips">
+              <h2>Operator tips</h2>
+              <ul>
+                <li>Add a cover from free image sites once the book exists.</li>
+                <li>Invite editors from the book page Share dialog.</li>
+                <li>Export JSON from Backup before major reshuffles.</li>
+                <li>AI refine stays optional — notes work offline.</li>
+              </ul>
+            </section>
+          </aside>
+
+          <section className="library-main">
+            <div className="library-toolbar">
+              <label className="library-filter-search">
+                <span className="sr-only">Filter books</span>
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Filter by title, description, owner…"
+                />
+              </label>
+              <div className="filter-row" role="tablist" aria-label="Role filter">
+                {(['ALL', 'OWNER', 'EDITOR', 'VIEWER'] as const).map((role) => (
+                  <button
+                    key={role}
+                    type="button"
+                    className={`filter-chip${filter === role ? ' is-active' : ''}`}
+                    onClick={() => setFilter(role)}
+                  >
+                    {role === 'ALL' ? 'All roles' : role.toLowerCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {loading ? (
+              <p className="muted">Opening shelves…</p>
+            ) : visible.length === 0 ? (
+              <div className="empty-state">
+                {books.length === 0
+                  ? 'No books yet. Create one in the sidebar to begin.'
+                  : 'No books match this filter.'}
+              </div>
+            ) : (
+              <div className="book-grid book-grid-dense">
+                {visible.map((book, index) => (
+                  <Link
+                    key={book.id}
+                    to={`/books/${book.id}`}
+                    className="book-tile book-tile-dense"
+                    style={{ animationDelay: `${index * 0.04}s` }}
+                  >
+                    {book.coverUrl ? (
+                      <img className="book-cover" src={book.coverUrl} alt="" />
+                    ) : (
+                      <div className="book-cover book-cover-empty" aria-hidden>
+                        <span>No cover</span>
+                      </div>
+                    )}
+                    <div className="book-tile-body">
+                      <div className="book-tile-top">
+                        <h2>{book.title}</h2>
+                        <span className={`role-pill role-${book.myRole.toLowerCase()}`}>
+                          {book.myRole.toLowerCase()}
+                        </span>
+                      </div>
+                      <p>{book.description || 'No description yet.'}</p>
+                      <div className="book-tile-meta">
+                        <span>{book.ownerDisplayName}</span>
+                        <span>Updated {formatTimestamp(book.updatedAt)}</span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
       </main>
-    </div>
+    </AppShell>
   )
 }

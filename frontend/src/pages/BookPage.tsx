@@ -1,8 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { api, ApiError, type Book, type Chapter, type Note } from '../api'
-import { useAuth } from '../auth'
+import { api, ApiError, formatTimestamp, type Book, type Chapter, type Note } from '../api'
 import { useDialog } from '../components/DialogProvider'
+import { AppShell } from '../components/AppShell'
 import { CoverPickerDialog } from '../components/CoverPickerDialog'
 import { NotesPanel } from '../components/NotesPanel'
 import { ShareDialog } from '../components/ShareDialog'
@@ -10,7 +10,6 @@ import { ShareDialog } from '../components/ShareDialog'
 export function BookPage() {
   const { bookId = '' } = useParams()
   const navigate = useNavigate()
-  const { logout, user } = useAuth()
   const { confirm } = useDialog()
   const [book, setBook] = useState<Book | null>(null)
   const [chapters, setChapters] = useState<Chapter[]>([])
@@ -131,20 +130,8 @@ export function BookPage() {
   }
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <Link to="/library" className="brand">
-          Rebeautifier<span>.</span>
-        </Link>
-        <div className="topbar-actions">
-          <span className="muted">{user?.displayName}</span>
-          <button className="btn btn-ghost" type="button" onClick={() => void logout()}>
-            Sign out
-          </button>
-        </div>
-      </header>
-
-      <main className="page">
+    <AppShell active="book">
+      <main className="page page-dense">
         <nav className="breadcrumb">
           <Link to="/library">Library</Link>
           <span>/</span>
@@ -154,7 +141,7 @@ export function BookPage() {
         {error && <div className="error-banner">{error}</div>}
 
         {book && (
-          <section className="detail-panel book-hero-panel">
+          <section className="detail-panel book-hero-panel dense-panel">
             <div className="book-hero-layout">
               <div className="cover-stage">
                 {book.coverUrl ? (
@@ -187,8 +174,30 @@ export function BookPage() {
                 )}
               </div>
               <div className="book-hero-copy">
-                <h1>{book.title}</h1>
+                <p className="page-eyebrow">Book workspace</p>
+                <div className="book-title-row">
+                  <h1>{book.title}</h1>
+                  <span className={`role-pill role-${book.myRole.toLowerCase()}`}>{book.myRole.toLowerCase()}</span>
+                </div>
                 <p className="muted">{book.description || 'No description yet.'}</p>
+                <dl className="page-meta-strip">
+                  <div>
+                    <dt>Owner</dt>
+                    <dd>{book.ownerDisplayName}</dd>
+                  </div>
+                  <div>
+                    <dt>Chapters</dt>
+                    <dd>{chapters.length}</dd>
+                  </div>
+                  <div>
+                    <dt>Notes</dt>
+                    <dd>{notes.length}</dd>
+                  </div>
+                  <div>
+                    <dt>Updated</dt>
+                    <dd>{formatTimestamp(book.updatedAt)}</dd>
+                  </div>
+                </dl>
                 <div className="book-hero-actions">
                   <Link className="btn btn-ghost" to="/backup">
                     Backup
@@ -209,7 +218,8 @@ export function BookPage() {
           </section>
         )}
 
-        <section className="detail-panel">
+        <div className="workspace-split">
+        <section className="detail-panel dense-panel">
           <div className="panel-heading">
             <h2>Chapters</h2>
             {canEdit && <p className="muted panel-sub">Drag to reorder, or use the arrows.</p>}
@@ -267,6 +277,7 @@ export function BookPage() {
           notes={notes}
           onChanged={load}
         />
+        </div>
       </main>
 
       {isOwner && (
@@ -281,6 +292,6 @@ export function BookPage() {
           onApplied={() => void load()}
         />
       )}
-    </div>
+    </AppShell>
   )
 }

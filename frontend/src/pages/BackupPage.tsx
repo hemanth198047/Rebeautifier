@@ -1,8 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError, type Book } from '../api'
-import { useAuth } from '../auth'
-import { AiStatusChip } from '../components/AiStatusChip'
+import { AppShell, PageHeader } from '../components/AppShell'
 import { useDialog } from '../components/DialogProvider'
 
 function readCookie(name: string): string | null {
@@ -17,7 +16,6 @@ async function ensureCsrf(): Promise<void> {
 }
 
 export function BackupPage() {
-  const { user, logout } = useAuth()
   const { confirm } = useDialog()
   const [books, setBooks] = useState<Book[]>([])
   const [bookId, setBookId] = useState('')
@@ -125,42 +123,32 @@ export function BackupPage() {
   }
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <Link to="/library" className="brand">
-          Rebeautifier<span>.</span>
-        </Link>
-        <div className="topbar-actions">
-          <Link className="btn btn-ghost" to="/library">
-            Library
-          </Link>
-          <Link className="btn btn-ghost" to="/search">
-            Search
-          </Link>
-          <Link className="btn btn-ghost" to="/settings">
-            Settings
-          </Link>
-          <AiStatusChip compact />
-          <span className="muted">{user?.displayName}</span>
-          <button className="btn btn-ghost" type="button" onClick={() => void logout()}>
-            Sign out
-          </button>
-        </div>
-      </header>
-
-      <main className="page">
-        <div className="library-header">
-          <div>
-            <h1>Backup & restore</h1>
-            <p className="muted">Export a book as Markdown or JSON (covers included in JSON v2). Restore a validated JSON backup as a new book you own.</p>
-          </div>
-        </div>
+    <AppShell active="backup">
+      <main className="page page-dense">
+        <PageHeader
+          eyebrow="Operations"
+          title="Backup & restore"
+          subtitle="Export a book as Markdown or JSON (covers included in JSON v2). Restore a validated JSON backup as a new book you own."
+          actions={
+            <Link className="btn btn-ghost" to="/library">
+              Library
+            </Link>
+          }
+          meta={[
+            { label: 'Books available', value: books.length },
+            { label: 'Owned (replaceable)', value: books.filter((b) => b.myRole === 'OWNER').length },
+            { label: 'JSON schema', value: 'v1 / v2' },
+            { label: 'Markdown', value: 'export' },
+          ]}
+        />
 
         {error && <div className="error-banner">{error}</div>}
         {success && <div className="success-banner">{success}</div>}
 
-        <section className="detail-panel">
+        <div className="workspace-split">
+        <section className="detail-panel dense-panel">
           <h2>Export</h2>
+          <p className="muted panel-sub">JSON is the portable backup. Markdown is readable for archives.</p>
           {books.length === 0 ? (
             <div className="empty-state">No books to export yet.</div>
           ) : (
@@ -187,7 +175,7 @@ export function BackupPage() {
           )}
         </section>
 
-        <section className="detail-panel">
+        <section className="detail-panel dense-panel">
           <h2>Restore JSON backup</h2>
           <p className="muted panel-sub">
             Paste a Rebeautifier backup (`schema: rebeautifier.book-backup`, version 1 or 2). Restore as a new book, or
@@ -228,7 +216,8 @@ export function BackupPage() {
             </button>
           </form>
         </section>
+        </div>
       </main>
-    </div>
+    </AppShell>
   )
 }
