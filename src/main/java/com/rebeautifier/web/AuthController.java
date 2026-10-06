@@ -1,6 +1,7 @@
 package com.rebeautifier.web;
 
 import com.rebeautifier.service.AuthService;
+import com.rebeautifier.service.RateLimitService;
 import com.rebeautifier.web.dto.LoginRequest;
 import com.rebeautifier.web.dto.RegisterRequest;
 import com.rebeautifier.web.dto.UserResponse;
@@ -23,9 +24,11 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final RateLimitService rateLimitService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, RateLimitService rateLimitService) {
         this.authService = authService;
+        this.rateLimitService = rateLimitService;
     }
 
     @PostMapping("/register")
@@ -33,6 +36,7 @@ public class AuthController {
     public UserResponse register(@Valid @RequestBody RegisterRequest request,
                                  HttpServletRequest httpRequest,
                                  HttpServletResponse httpResponse) {
+        rateLimitService.checkAuth(clientKey(httpRequest));
         return authService.register(request, httpRequest, httpResponse);
     }
 
@@ -40,6 +44,7 @@ public class AuthController {
     public UserResponse login(@Valid @RequestBody LoginRequest request,
                               HttpServletRequest httpRequest,
                               HttpServletResponse httpResponse) {
+        rateLimitService.checkAuth(clientKey(httpRequest));
         return authService.login(request, httpRequest, httpResponse);
     }
 
@@ -61,5 +66,13 @@ public class AuthController {
                 "parameterName", csrfToken.getParameterName(),
                 "token", csrfToken.getToken()
         );
+    }
+
+    private static String clientKey(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr() == null ? "unknown" : request.getRemoteAddr();
     }
 }

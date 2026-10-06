@@ -138,7 +138,7 @@ public class BookService {
         User actor = authService.requireCurrentUser();
         accessControlService.requireRole(bookId, actor, AccessControlService.owners());
         if (request.role() == BookRole.OWNER) {
-            throw ApiException.badRequest("Cannot assign OWNER via invite; transfer is not supported yet");
+            throw ApiException.badRequest("Cannot assign OWNER via invite; use ownership transfer instead");
         }
         User invitee = userRepository.findByUsernameIgnoreCase(request.usernameOrEmail())
                 .or(() -> userRepository.findByEmailIgnoreCase(request.usernameOrEmail()))
@@ -184,6 +184,42 @@ public class BookService {
             throw ApiException.badRequest("Cannot remove the owner");
         }
         bookMemberRepository.delete(member);
+    }
+
+    /**
+     * Transfer book ownership to another existing user. Previous owner becomes EDITOR.
+     */
+    @Transactional
+    public BookResponse transferOwnership(UUID bookId, String usernameOrEmail) {
+        User actor = authService.requireCurrentUser();
+        accessControlService.requireRole(bookId, actor, AccessControlService.owners());
+        Book book = accessControlService.requireBook(bookId);
+        User nextOwner = userRepository.findByUsernameIgnoreCase(usernameOrEmail)
+                .or(() -> userRepository.findByEmailIgnoreCase(usernameOrEmail))
+                .orElseThrow(() -> ApiException.notFound("User not found"));
+        if (nextOwner.getId().equals(actor.getId())) {
+            throw ApiException.badRequest("You already own this book");
+        }
+
+        BookMember previousOwnerMembership = bookMemberRepository.findByBookIdAndUserId(bookId, actor.getId())
+                .orElseThrow(() -> ApiException.notFound("Owner membership not found"));
+        previousOwnerMembership.setRole(BookRole.EDITOR);
+
+        BookMember nextMembership = bookMemberRepository.findByBookIdAndUserId(bookId, nextOwner.getId())
+                .orElse(null);
+        if (nextMembership == null) {
+            nextMembership = new BookMember();
+            nextMembership.setBook(book);
+            nextMembership.setUser(nextOwner);
+            nextMembership.setRole(BookRole.OWNER);
+            bookMemberRepository.save(nextMembership);
+        } else {
+            nextMembership.setRole(BookRole.OWNER);
+        }
+
+        book.setOwner(nextOwner);
+        bookRepository.save(book);
+        return toResponse(book, actor);
     }
 
     private BookResponse toResponse(Book book, User viewer) {

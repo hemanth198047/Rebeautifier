@@ -22,6 +22,7 @@ export function BackupPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [importText, setImportText] = useState('')
+  const [replaceTargetId, setReplaceTargetId] = useState('')
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -74,12 +75,29 @@ export function BackupPage() {
     setError(null)
     setSuccess(null)
     try {
-      const created = await api<Book>('/api/v1/books/import', {
-        method: 'POST',
-        body: importText,
-        headers: { 'Content-Type': 'application/json' },
-      })
-      setSuccess(`Restored “${created.title}” into your library`)
+      if (replaceTargetId) {
+        const owned = books.find((b) => b.id === replaceTargetId)
+        if (!owned || owned.myRole !== 'OWNER') {
+          throw new ApiError(403, 'FORBIDDEN', 'You can only replace books you own')
+        }
+        if (!confirm(`Replace all content in “${owned.title}”? Collaborators stay; notes/chapters are overwritten.`)) {
+          setBusy(false)
+          return
+        }
+        const updated = await api<Book>(`/api/v1/books/${replaceTargetId}/import`, {
+          method: 'PUT',
+          body: importText,
+          headers: { 'Content-Type': 'application/json' },
+        })
+        setSuccess(`Replaced content of “${updated.title}”`)
+      } else {
+        const created = await api<Book>('/api/v1/books/import', {
+          method: 'POST',
+          body: importText,
+          headers: { 'Content-Type': 'application/json' },
+        })
+        setSuccess(`Restored “${created.title}” into your library`)
+      }
       setImportText('')
       const data = await api<Book[]>('/api/v1/books')
       setBooks(data)
@@ -162,7 +180,8 @@ export function BackupPage() {
         <section className="detail-panel">
           <h2>Restore JSON backup</h2>
           <p className="muted panel-sub">
-            Paste a Rebeautifier backup (`schema: rebeautifier.book-backup`, version 1 or 2). Version 2 may include a cover image. Invalid files are rejected with a clear error.
+            Paste a Rebeautifier backup (`schema: rebeautifier.book-backup`, version 1 or 2). Restore as a new book, or
+            replace an owned book in place (members kept).
           </p>
           <form className="form-stack" onSubmit={(e) => void onImport(e)}>
             <label className="btn btn-ghost" style={{ width: 'fit-content' }}>
@@ -174,6 +193,19 @@ export function BackupPage() {
                 onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
               />
             </label>
+            <label>
+              Restore mode
+              <select value={replaceTargetId} onChange={(e) => setReplaceTargetId(e.target.value)}>
+                <option value="">Create a new owned book</option>
+                {books
+                  .filter((b) => b.myRole === 'OWNER')
+                  .map((b) => (
+                    <option key={b.id} value={b.id}>
+                      Replace “{b.title}” in place
+                    </option>
+                  ))}
+              </select>
+            </label>
             <textarea
               value={importText}
               onChange={(e) => setImportText(e.target.value)}
@@ -182,7 +214,7 @@ export function BackupPage() {
               required
             />
             <button className="btn btn-primary" type="submit" disabled={busy || !importText.trim()}>
-              {busy ? 'Restoring…' : 'Restore as new book'}
+              {busy ? 'Restoring…' : replaceTargetId ? 'Replace book content' : 'Restore as new book'}
             </button>
           </form>
         </section>

@@ -7,6 +7,7 @@ import com.rebeautifier.web.dto.BookResponse;
 import com.rebeautifier.web.dto.BookUpdateRequest;
 import com.rebeautifier.web.dto.MemberAddRequest;
 import com.rebeautifier.web.dto.MemberResponse;
+import com.rebeautifier.web.dto.TransferOwnershipRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -100,5 +101,11 @@ public class BookController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removeMember(@PathVariable UUID bookId, @PathVariable UUID userId) {
         bookService.removeMember(bookId, userId);
+    }
+
+    @PostMapping("/{bookId}/transfer")
+    public BookResponse transferOwnership(@PathVariable UUID bookId,
+                                          @Valid @RequestBody TransferOwnershipRequest request) {
+        return bookService.transferOwnership(bookId, request.usernameOrEmail());
     }
 }

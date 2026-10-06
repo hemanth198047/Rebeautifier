@@ -18,6 +18,8 @@ public interface NoteRepository extends JpaRepository<Note, UUID> {
 
     List<Note> findBySectionIdAndAttachTypeOrderByPositionAsc(UUID sectionId, NoteAttachType attachType);
 
+    void deleteByBookId(UUID bookId);
+
     @Query("""
             SELECT n FROM Note n
             WHERE n.book.id = :bookId

@@ -96,7 +96,7 @@ Env knobs (API process):
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama HTTP API |
 | `OLLAMA_MODEL` | `llama3.2:1b` | Default refine model |
 | `OLLAMA_MAX_CONCURRENT` | `1` | In-flight AI jobs |
-| `APP_VERSION` | `0.2.0` | Reported in health payloads |
+| `APP_VERSION` | `0.3.0` | Reported in health payloads |
 | `SESSION_COOKIE_SECURE` | `false` | Secure session cookie (HTTPS) |
 
 ## Backup and recovery

@@ -32,10 +32,13 @@ server:
     include-message: never
 
 rebeautifier:
-  app-version: ${APP_VERSION:0.2.0}
+  app-version: ${APP_VERSION:0.3.0}
   cors-origins: ${CORS_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
   cover-storage-path: ${COVER_STORAGE_PATH:./data/covers}
   seed-demo-data: ${SEED_DEMO_DATA:true}
+  rate-limit:
+    auth-per-minute: ${RATE_LIMIT_AUTH_PER_MINUTE:30}
+    ai-per-minute: ${RATE_LIMIT_AI_PER_MINUTE:20}
   ollama:
     base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
     model: ${OLLAMA_MODEL:llama3.2:1b}

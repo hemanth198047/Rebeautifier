@@ -9,6 +9,9 @@ spring:
 rebeautifier:
   seed-demo-data: false
   cover-storage-path: ${java.io.tmpdir}/rebeautifier-test-covers
+  rate-limit:
+    auth-per-minute: 1000
+    ai-per-minute: 1000
   ollama:
     mock-enabled: true
     model: llama3.2:1b

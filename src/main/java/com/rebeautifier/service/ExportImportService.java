@@ -137,6 +137,38 @@ public class ExportImportService {
         ownerMembership.setRole(BookRole.OWNER);
         bookMemberRepository.save(ownerMembership);
 
+        populateBookContent(user, book, payload);
+        return bookService.get(book.getId());
+    }
+
+    /**
+     * Replace hierarchy/content of an owned book while preserving memberships.
+     */
+    @Transactional
+    public BookResponse replaceImportJson(UUID bookId, String rawJson) {
+        User user = authService.requireCurrentUser();
+        accessControlService.requireRole(bookId, user, AccessControlService.owners());
+        Book book = accessControlService.requireBook(bookId);
+        BookBackupDocument document = parseAndValidate(rawJson);
+        BookBackupDocument.BookPayload payload = document.book();
+
+        coverStorageService.deleteIfPresent(book.getCoverStorageKey());
+        book.setCoverStorageKey(null);
+        book.setCoverMime(null);
+        noteRepository.deleteByBookId(bookId);
+        chapterRepository.deleteByBookId(bookId);
+        noteRepository.flush();
+        chapterRepository.flush();
+
+        book.setTitle(requireTitle(payload.title(), "Book title"));
+        book.setDescription(blankToNull(payload.description()));
+        bookRepository.saveAndFlush(book);
+
+        populateBookContent(user, book, payload);
+        return bookService.get(book.getId());
+    }
+
+    private void populateBookContent(User user, Book book, BookBackupDocument.BookPayload payload) {
         restoreCover(book, payload);
 
         if (payload.notes() != null) {
@@ -181,8 +213,6 @@ public class ExportImportService {
                 }
             }
         }
-
-        return bookService.get(book.getId());
     }
 
     private BookBackupDocument parseAndValidate(String rawJson) {
