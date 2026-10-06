@@ -90,7 +90,7 @@ public class OllamaClient {
         } catch (Exception ex) {
             long latency = System.currentTimeMillis() - started;
             log.debug("Ollama probe failed: {}", ex.toString());
-            return AiStatusProbe.unavailable("Ollama unreachable: " + shortMessage(ex), latency, List.of());
+            return AiStatusProbe.unavailable(friendlyUnreachable(ex), latency, List.of());
         }
     }
 
@@ -139,10 +139,28 @@ public class OllamaClient {
         return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
 
+    private static String friendlyUnreachable(Exception ex) {
+        String detail = shortMessage(ex);
+        String lower = detail.toLowerCase();
+        if (lower.contains("connect") || lower.contains("timed out") || lower.contains("unreachable")
+                || lower.contains("unknown host") || lower.contains("connection refused")) {
+            return "Ollama is not running or not reachable at the configured URL";
+        }
+        return "Ollama unreachable: " + detail;
+    }
+
     private static String shortMessage(Exception ex) {
-        String msg = ex.getMessage();
+        Throwable root = ex;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        String msg = root.getMessage();
         if (msg == null || msg.isBlank()) {
-            return ex.getClass().getSimpleName();
+            msg = root.getClass().getSimpleName();
+        }
+        // Prefer concise type for common java.net failures (avoid "ConnectException" alone in UI).
+        if ("ConnectException".equals(msg) || "Connection refused".equalsIgnoreCase(msg)) {
+            return "connection refused";
         }
         return msg.length() > 180 ? msg.substring(0, 180) + "…" : msg;
     }

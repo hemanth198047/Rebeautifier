@@ -88,7 +88,7 @@ API_PORT="$(grep -E '^[[:space:]]*API_PORT=' .env 2>/dev/null | tail -n1 | cut -
 API_PORT="${API_PORT:-8080}"
 BASE_URL="http://localhost:${API_PORT}"
 
-echo Starting Rebeautifier (Compose)...
+echo "Starting Rebeautifier (Compose)..."
 "${COMPOSE[@]}" "${FILE_ARGS[@]}" "${PROFILE_ARGS[@]}" up "${BUILD_ARGS[@]}" "${DETACH_ARGS[@]}"
 
 if [[ "$FOREGROUND" -eq 1 ]]; then
