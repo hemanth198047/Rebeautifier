@@ -157,10 +157,12 @@ public class ExportImportService {
         book.setCoverMime(null);
         noteRepository.deleteByBookId(bookId);
         chapterRepository.deleteByBookId(bookId);
+        noteRepository.flush();
+        chapterRepository.flush();
 
         book.setTitle(requireTitle(payload.title(), "Book title"));
         book.setDescription(blankToNull(payload.description()));
-        bookRepository.save(book);
+        bookRepository.saveAndFlush(book);
 
         populateBookContent(user, book, payload);
         return bookService.get(book.getId());

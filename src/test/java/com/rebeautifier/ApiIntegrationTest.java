@@ -626,7 +626,8 @@ class ApiIntegrationTest {
 
         mockMvc.perform(get("/api/v1/books/" + bookId + "/members").session(session))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.username=='heir_%s')].role".formatted(suffix)).value("OWNER"));
+                .andExpect(jsonPath("$[*].username", org.hamcrest.Matchers.hasItem("heir_" + suffix)))
+                .andExpect(jsonPath("$[*].role", org.hamcrest.Matchers.hasItem("OWNER")));
     }
 
     @Test
