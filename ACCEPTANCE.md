@@ -35,6 +35,9 @@ Use after a clean install (Compose recommended). Mark each item when verified.
 - [ ] JSON backup schema v2 includes cover when present; v1 backups still import
 - [ ] Search returns ranked FTS hits (substring fallback still works)
 - [ ] GitHub Actions CI workflow is present under `.github/workflows/ci.yml`
+- [ ] Settings can update display name (`PATCH /api/v1/auth/me`)
+- [ ] Markdown export embeds small covers as data URIs; oversized covers keep a JSON note
+- [ ] Change password works from Settings
 
 ## Automated gates
 

@@ -2,7 +2,7 @@
 
 A calm, installable reading library for organizing thoughts as **Book → Chapter → Section → Notes**. Multi-user accounts with Owner / Editor / Viewer membership. Rich-text notes work without AI. Optional local AI refine via **Ollama** (backend-only).
 
-**Version:** 0.4.0 · Full setup: [`SETUP.md`](./SETUP.md) · Acceptance: [`ACCEPTANCE.md`](./ACCEPTANCE.md)
+**Version:** 0.5.0 · Full setup: [`SETUP.md`](./SETUP.md) · Acceptance: [`ACCEPTANCE.md`](./ACCEPTANCE.md)
 
 ## Stack
 
@@ -137,7 +137,7 @@ Then visit http://localhost:8080 → sign in as `reader` / `password123` → ope
 
 | Area | Endpoints |
 | --- | --- |
-| Auth | `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`, `POST /auth/change-password`, `GET /auth/csrf` |
+| Auth | `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET/PATCH /auth/me`, `POST /auth/change-password`, `GET /auth/csrf` |
 | Books | CRUD + `PUT/DELETE .../cover` + members |
 | Chapters | list/create/reorder under book; patch/delete by id |
 | Sections | list/create/reorder under chapter; patch/delete by id |
@@ -167,4 +167,4 @@ scripts/smoke-check.sh
 
 ## Phase status
 
-Phase 9 (account & observability) — change password, AI refine metrics, Markdown cover note.
+Phase 10 (profile & Markdown covers) — display-name edit, data-URI cover embed, structured auth/AI logs.

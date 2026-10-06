@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { api, ApiError, type AiStatus } from '../api'
+import { api, ApiError, type AiStatus, type User } from '../api'
 import { useAuth } from '../auth'
 import { AiStatusChip } from '../components/AiStatusChip'
 
@@ -15,17 +15,24 @@ type Ready = Health & {
 }
 
 export function SettingsPage() {
-  const { user, logout } = useAuth()
+  const { user, logout, setUser } = useAuth()
   const [ai, setAi] = useState<AiStatus | null>(null)
   const [health, setHealth] = useState<Health | null>(null)
   const [ready, setReady] = useState<Ready | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [passwordMsg, setPasswordMsg] = useState<string | null>(null)
+  const [profileMsg, setProfileMsg] = useState<string | null>(null)
+  const [displayName, setDisplayName] = useState(user?.displayName ?? '')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [passwordBusy, setPasswordBusy] = useState(false)
+  const [profileBusy, setProfileBusy] = useState(false)
 
-  async function refresh() {
+  useEffect(() => {
+    setDisplayName(user?.displayName ?? '')
+  }, [user?.displayName])
+
+  async function refreshStatus() {
     setError(null)
     try {
       const [aiStatus, healthStatus, readyStatus] = await Promise.all([
@@ -42,8 +49,27 @@ export function SettingsPage() {
   }
 
   useEffect(() => {
-    void refresh()
+    void refreshStatus()
   }, [])
+
+  async function onSaveProfile(event: FormEvent) {
+    event.preventDefault()
+    setProfileBusy(true)
+    setProfileMsg(null)
+    setError(null)
+    try {
+      const updated = await api<User>('/api/v1/auth/me', {
+        method: 'PATCH',
+        body: JSON.stringify({ displayName }),
+      })
+      setUser(updated)
+      setProfileMsg('Display name updated')
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not update profile')
+    } finally {
+      setProfileBusy(false)
+    }
+  }
 
   async function onChangePassword(event: FormEvent) {
     event.preventDefault()
@@ -95,22 +121,19 @@ export function SettingsPage() {
             <h1>Settings</h1>
             <p className="muted">Account, install health, and local AI setup — all stay on this host.</p>
           </div>
-          <button className="btn btn-ghost" type="button" onClick={() => void refresh()}>
+          <button className="btn btn-ghost" type="button" onClick={() => void refreshStatus()}>
             Refresh status
           </button>
         </div>
 
         {error && <div className="error-banner">{error}</div>}
+        {profileMsg && <div className="success-banner">{profileMsg}</div>}
         {passwordMsg && <div className="success-banner">{passwordMsg}</div>}
 
         <section className="settings-grid">
           <article className="settings-panel">
             <h2>Account</h2>
             <dl className="settings-dl">
-              <div>
-                <dt>Display name</dt>
-                <dd>{user?.displayName}</dd>
-              </div>
               <div>
                 <dt>Username</dt>
                 <dd>{user?.username}</dd>
@@ -120,6 +143,22 @@ export function SettingsPage() {
                 <dd>{user?.email}</dd>
               </div>
             </dl>
+            <form className="form-stack password-form" onSubmit={(e) => void onSaveProfile(e)}>
+              <h3>Display name</h3>
+              <label>
+                How you appear to collaborators
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  required
+                  maxLength={120}
+                />
+              </label>
+              <button className="btn btn-primary" type="submit" disabled={profileBusy}>
+                {profileBusy ? 'Saving…' : 'Save display name'}
+              </button>
+            </form>
             <form className="form-stack password-form" onSubmit={(e) => void onChangePassword(e)}>
               <h3>Change password</h3>
               <label>

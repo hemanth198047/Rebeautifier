@@ -188,8 +188,8 @@ public class RefinementService {
             noteRevisionRepository.save(revision);
             long elapsed = System.currentTimeMillis() - started;
             aiMetrics.recordSuccess(elapsed);
-            log.info("Refinement {} mode={} status={} note={} latencyMs={}", revision.getId(), revision.getMode(),
-                    revision.getStatus(), noteId, elapsed);
+            log.info("event=ai_refine revisionId={} mode={} status={} noteId={} latencyMs={} userId={}",
+                    revision.getId(), revision.getMode(), revision.getStatus(), noteId, elapsed, user.getId());
             return toResponse(revision, fresh);
         } catch (ApiException ex) {
             if ("AI_BUSY".equals(ex.getCode())) {
@@ -197,7 +197,10 @@ public class RefinementService {
                 revision.setErrorMessage(ex.getMessage());
                 revision.setFinalizedAt(Instant.now());
                 noteRevisionRepository.save(revision);
-                aiMetrics.recordFailure(System.currentTimeMillis() - started);
+                long elapsed = System.currentTimeMillis() - started;
+                aiMetrics.recordFailure(elapsed);
+                log.warn("event=ai_refine revisionId={} mode={} status=FAILED noteId={} latencyMs={} userId={} code=AI_BUSY",
+                        revision.getId(), revision.getMode(), noteId, elapsed, user.getId());
             }
             throw ex;
         } catch (OllamaClient.OllamaException ex) {
@@ -205,7 +208,10 @@ public class RefinementService {
             revision.setErrorMessage(ex.getMessage());
             revision.setFinalizedAt(Instant.now());
             noteRevisionRepository.save(revision);
-            aiMetrics.recordFailure(System.currentTimeMillis() - started);
+            long elapsed = System.currentTimeMillis() - started;
+            aiMetrics.recordFailure(elapsed);
+            log.warn("event=ai_refine revisionId={} mode={} status=FAILED noteId={} latencyMs={} userId={} code=AI_FAILED",
+                    revision.getId(), revision.getMode(), noteId, elapsed, user.getId());
             throw new ApiException("AI_FAILED", ex.getMessage(), HttpStatus.BAD_GATEWAY);
         }
     }

@@ -3,6 +3,7 @@ package com.rebeautifier.web;
 import com.rebeautifier.web.dto.ChangePasswordRequest;
 import com.rebeautifier.web.dto.LoginRequest;
 import com.rebeautifier.web.dto.RegisterRequest;
+import com.rebeautifier.web.dto.UpdateProfileRequest;
 import com.rebeautifier.web.dto.UserResponse;
 import com.rebeautifier.service.AuthService;
 import com.rebeautifier.service.RateLimitService;
@@ -12,6 +13,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -58,6 +60,11 @@ public class AuthController {
     @GetMapping("/me")
     public UserResponse me() {
         return authService.me();
+    }
+
+    @PatchMapping("/me")
+    public UserResponse updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
+        return authService.updateProfile(request.displayName());
     }
 
     @PostMapping("/change-password")

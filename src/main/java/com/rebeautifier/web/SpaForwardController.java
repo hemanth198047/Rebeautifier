@@ -15,7 +15,10 @@ public class SpaForwardController {
             "/library/**",
             "/login",
             "/register",
-            "/books/**"
+            "/books/**",
+            "/backup",
+            "/settings",
+            "/search"
     })
     public String forward() {
         return "forward:/index.html";
