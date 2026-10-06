@@ -111,6 +111,18 @@ export type AiStatus = {
   metricsAverageLatencyMs: number
 }
 
+export type RateLimitStatus = {
+  storage: string
+  windowSeconds: number
+  authPerMinute: number
+  authUsed: number
+  authRemaining: number
+  aiPerMinute: number
+  aiUsed: number
+  aiRemaining: number
+  note: string
+}
+
 export type SearchHit = {
   type: 'BOOK' | 'CHAPTER' | 'SECTION' | 'NOTE'
   id: string
@@ -133,11 +145,13 @@ export type SearchResponse = {
 export class ApiError extends Error {
   code: string
   status: number
+  retryAfterSeconds: number | null
 
-  constructor(status: number, code: string, message: string) {
+  constructor(status: number, code: string, message: string, retryAfterSeconds: number | null = null) {
     super(message)
     this.status = status
     this.code = code
+    this.retryAfterSeconds = retryAfterSeconds
   }
 }
 
@@ -181,11 +195,17 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const data = text ? JSON.parse(text) : null
 
   if (!response.ok) {
-    throw new ApiError(
-      response.status,
-      data?.code ?? 'ERROR',
-      data?.message ?? 'Request failed',
-    )
+    const retryHeader = response.headers.get('Retry-After')
+    const retryFromBody =
+      typeof data?.retryAfterSeconds === 'number' ? data.retryAfterSeconds : null
+    const retryAfterSeconds =
+      retryFromBody ?? (retryHeader && /^\d+$/.test(retryHeader) ? Number(retryHeader) : null)
+    const baseMessage = data?.message ?? 'Request failed'
+    const message =
+      data?.code === 'RATE_LIMITED' && retryAfterSeconds != null
+        ? formatRateLimitedMessage(baseMessage, retryAfterSeconds)
+        : baseMessage
+    throw new ApiError(response.status, data?.code ?? 'ERROR', message, retryAfterSeconds)
   }
 
   return data as T
@@ -193,6 +213,15 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export function noteHref(note: Note): string {
   return `/books/${note.bookId}/notes/${note.id}`
+}
+
+export function formatRateLimitedMessage(baseMessage: string, retryAfterSeconds: number): string {
+  const seconds = Math.max(1, Math.floor(retryAfterSeconds))
+  const wait =
+    seconds === 1 ? 'Try again in 1 second.' : `Try again in ${seconds} seconds.`
+  const trimmed = baseMessage.trim()
+  if (!trimmed) return wait
+  return trimmed.endsWith('.') ? `${trimmed} ${wait}` : `${trimmed}. ${wait}`
 }
 
 export function formatPageRange(pageStart: number | null, pageEnd: number | null): string | null {

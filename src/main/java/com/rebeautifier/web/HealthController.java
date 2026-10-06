@@ -21,7 +21,7 @@ public class HealthController {
 
     public HealthController(
             DataSource dataSource,
-            @Value("${rebeautifier.app-version:0.5.0}") String appVersion
+            @Value("${rebeautifier.app-version:0.6.0}") String appVersion
     ) {
         this.dataSource = dataSource;
         this.appVersion = appVersion;

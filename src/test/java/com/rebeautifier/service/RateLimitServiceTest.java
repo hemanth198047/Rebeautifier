@@ -25,4 +25,18 @@ class RateLimitServiceTest {
         // other clients unaffected
         service.checkAuth("client-b");
     }
+
+    @Test
+    void peekDoesNotConsumeQuota() {
+        RateLimitService service = new RateLimitService(3, 4);
+        assertThat(service.peekAuth("client-x").used()).isZero();
+        assertThat(service.peekAuth("client-x").remaining()).isEqualTo(3);
+        service.checkAuth("client-x");
+        RateLimitService.Usage after = service.peekAuth("client-x");
+        assertThat(after.used()).isEqualTo(1);
+        assertThat(after.remaining()).isEqualTo(2);
+        assertThat(service.peekAuth("client-x").used()).isEqualTo(1);
+        assertThat(service.aiPerMinute()).isEqualTo(4);
+        assertThat(service.authPerMinute()).isEqualTo(3);
+    }
 }

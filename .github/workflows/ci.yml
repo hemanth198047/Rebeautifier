@@ -44,8 +44,9 @@ jobs:
       - name: Backend tests
         run: ./mvnw -B test
 
-      - name: Frontend build
+      - name: Frontend build and unit tests
         working-directory: frontend
         run: |
           npm ci
+          npm test
           npm run build
