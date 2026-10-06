@@ -687,13 +687,45 @@ select:focus {
   padding: 0.35rem 0.75rem;
   border-radius: 999px;
   border: 1px solid var(--border);
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
 
-.save-dirty { color: var(--accent-soft); }
-.save-saving { color: var(--success-soft); }
-.save-saved { color: var(--success-soft); }
-.save-failed { color: var(--danger-soft); }
+.save-dirty {
+  color: var(--accent-soft);
+  background: rgba(217, 119, 87, 0.1);
+  border-color: rgba(217, 119, 87, 0.28);
+}
+
+.save-saving {
+  color: var(--success);
+  background: rgba(5, 150, 105, 0.1);
+  border-color: rgba(5, 150, 105, 0.28);
+}
+
+.save-saved {
+  color: var(--success);
+  background: rgba(5, 150, 105, 0.12);
+  border-color: rgba(5, 150, 105, 0.35);
+  font-weight: 600;
+}
+
+.save-failed {
+  color: var(--danger-soft);
+  background: rgba(185, 28, 28, 0.08);
+  border-color: rgba(185, 28, 28, 0.28);
+}
+
 .save-idle { color: var(--text-muted); }
+
+.btn-save-ok {
+  background: var(--success) !important;
+  border-color: var(--success) !important;
+}
+
+.btn-save-fail {
+  background: var(--danger) !important;
+  border-color: var(--danger) !important;
+}
 
 .editor-shell {
   border-radius: 16px;

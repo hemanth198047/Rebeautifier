@@ -40,6 +40,9 @@ export function SettingsPage() {
   const [passwordBusy, setPasswordBusy] = useState(false)
   const [profileBusy, setProfileBusy] = useState(false)
   const [aiBusy, setAiBusy] = useState(false)
+  const [aiJustSaved, setAiJustSaved] = useState(false)
+  const [profileJustSaved, setProfileJustSaved] = useState(false)
+  const [passwordJustSaved, setPasswordJustSaved] = useState(false)
   const [pullBusy, setPullBusy] = useState(false)
   const [pullProgress, setPullProgress] = useState<string | null>(null)
 
@@ -120,6 +123,8 @@ export function SettingsPage() {
       })
       setUser(updated)
       setProfileMsg('Display name updated')
+      setProfileJustSaved(true)
+      window.setTimeout(() => setProfileJustSaved(false), 2800)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not update profile')
     } finally {
@@ -140,6 +145,8 @@ export function SettingsPage() {
       setCurrentPassword('')
       setNewPassword('')
       setPasswordMsg('Password updated')
+      setPasswordJustSaved(true)
+      window.setTimeout(() => setPasswordJustSaved(false), 2800)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not change password')
     } finally {
@@ -191,6 +198,8 @@ export function SettingsPage() {
         setAiMsg('AI disabled. Notes still work.')
       }
       setAiBusy(false)
+      setAiJustSaved(true)
+      window.setTimeout(() => setAiJustSaved(false), 2800)
       if (wantPullAfterSave && saved.enabled) {
         await runPullModel(modelToSave)
       }
@@ -318,8 +327,13 @@ export function SettingsPage() {
                 Display name
                 <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} required maxLength={120} />
               </label>
-              <button className="btn btn-primary" type="submit" disabled={profileBusy}>
-                {profileBusy ? 'Saving…' : 'Save profile'}
+              <button
+                className={`btn btn-primary${profileJustSaved ? ' btn-save-ok' : ''}`}
+                type="submit"
+                disabled={profileBusy}
+                aria-live="polite"
+              >
+                {profileBusy ? 'Saving…' : profileJustSaved ? 'Saved' : 'Save profile'}
               </button>
             </form>
           </article>
@@ -347,8 +361,13 @@ export function SettingsPage() {
                   minLength={8}
                 />
               </label>
-              <button className="btn btn-primary" type="submit" disabled={passwordBusy}>
-                {passwordBusy ? 'Updating…' : 'Change password'}
+              <button
+                className={`btn btn-primary${passwordJustSaved ? ' btn-save-ok' : ''}`}
+                type="submit"
+                disabled={passwordBusy}
+                aria-live="polite"
+              >
+                {passwordBusy ? 'Updating…' : passwordJustSaved ? 'Updated' : 'Change password'}
               </button>
             </form>
           </article>
@@ -529,8 +548,13 @@ export function SettingsPage() {
               )}
 
               <div className="settings-actions">
-                <button className="btn btn-primary" type="submit" disabled={aiBusy || pullBusy}>
-                  {aiBusy ? 'Saving…' : 'Save AI settings'}
+                <button
+                  className={`btn btn-primary${aiJustSaved ? ' btn-save-ok' : ''}`}
+                  type="submit"
+                  disabled={aiBusy || pullBusy}
+                  aria-live="polite"
+                >
+                  {aiBusy ? 'Saving…' : aiJustSaved ? 'Saved' : 'Save AI settings'}
                 </button>
                 {aiEnabled && aiProvider === 'OLLAMA' && (
                   <button

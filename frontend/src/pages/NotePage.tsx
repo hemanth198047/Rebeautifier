@@ -117,11 +117,10 @@ export function NotePage() {
         })
         applyNote(updated)
         setSaveState('saved')
-        if (opts?.manual) {
-          window.setTimeout(() => {
-            if (!dirtyRef.current) setSaveState('idle')
-          }, 1600)
-        }
+        // Keep "Saved" visible long enough that the button + banner are noticeable.
+        window.setTimeout(() => {
+          if (!dirtyRef.current) setSaveState('idle')
+        }, opts?.manual ? 2800 : 1600)
         return updated
       } catch (err) {
         dirtyRef.current = true
@@ -257,6 +256,16 @@ export function NotePage() {
         </nav>
 
         {error && <div className="error-banner">{error}</div>}
+        {saveState === 'saved' && (
+          <div className="success-banner" role="status" aria-live="polite">
+            Note saved
+          </div>
+        )}
+        {saveState === 'failed' && !error && (
+          <div className="error-banner" role="alert">
+            Save failed — try again
+          </div>
+        )}
 
         <section className="detail-panel note-editor-panel">
           <div className="note-editor-header">
@@ -274,8 +283,20 @@ export function NotePage() {
             <div className="note-editor-actions">
               {canEdit && (
                 <>
-                  <button className="btn btn-primary" type="button" onClick={() => void onManualSave()}>
-                    Save
+                  <button
+                    className={`btn btn-primary${saveState === 'saved' ? ' btn-save-ok' : ''}${saveState === 'failed' ? ' btn-save-fail' : ''}`}
+                    type="button"
+                    onClick={() => void onManualSave()}
+                    disabled={saveState === 'saving'}
+                    aria-live="polite"
+                  >
+                    {saveState === 'saving'
+                      ? 'Saving…'
+                      : saveState === 'saved'
+                        ? 'Saved'
+                        : saveState === 'failed'
+                          ? 'Retry save'
+                          : 'Save'}
                   </button>
                   <button
                     className="btn btn-ghost"
