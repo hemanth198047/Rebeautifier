@@ -221,15 +221,15 @@ button {
 .page-header-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.75rem;
 }
 
 .page-meta-strip {
-  margin: 1rem 0 0;
+  margin: 0;
   padding: 0;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.65rem;
+  gap: 0.75rem;
 }
 
 .page-meta-strip > div {
@@ -283,7 +283,7 @@ button {
 .dense-panel,
 .create-panel.dense-panel,
 .detail-panel.dense-panel {
-  padding: 1.15rem 1.2rem 1.25rem;
+  padding: 1.35rem 1.4rem 1.5rem;
 }
 
 .library-tips ul {
@@ -419,7 +419,7 @@ button {
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
-  margin-bottom: 0.35rem;
+  margin: 0;
 }
 
 .book-title-row h1 {
@@ -429,7 +429,7 @@ button {
 .workspace-split {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+  gap: 1.25rem;
   align-items: start;
 }
 
@@ -612,7 +612,7 @@ button {
 
 .landing-nav-actions {
   display: flex;
-  gap: 0.55rem;
+  gap: 0.75rem;
   align-items: center;
 }
 
@@ -658,7 +658,7 @@ button {
 .landing-hero-cta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.65rem;
+  gap: 0.85rem;
   margin: 1.5rem 0 1.25rem;
 }
 
@@ -1288,7 +1288,7 @@ button {
 }
 .form-stack {
   display: grid;
-  gap: 0.9rem;
+  gap: 1rem;
 }
 
 label {
@@ -1296,6 +1296,15 @@ label {
   gap: 0.35rem;
   font-family: var(--font-ui);
   font-size: 0.95rem;
+}
+
+/* Buttons that are labels (file pickers) must not inherit form-label grid layout */
+label.btn {
+  display: inline-flex;
+  gap: 0.4rem;
+  width: fit-content;
+  cursor: pointer;
+  font-size: inherit;
 }
 
 input,
@@ -1477,7 +1486,7 @@ select:focus {
   padding: 0;
   margin: 0;
   display: grid;
-  gap: 0.65rem;
+  gap: 0.85rem;
 }
 
 .list-item {
@@ -1485,7 +1494,7 @@ select:focus {
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  padding: 0.95rem 1.1rem;
+  padding: 1.05rem 1.15rem;
   border-radius: 14px;
   background: rgba(15, 23, 42, 0.06);
   border: 1px solid rgba(15, 23, 42, 0.06);
@@ -1504,9 +1513,10 @@ select:focus {
 
 .inline-form {
   display: flex;
-  gap: 0.6rem;
+  gap: 0.75rem;
   flex-wrap: wrap;
-  margin-top: 1rem;
+  align-items: center;
+  margin-top: 1.25rem;
 }
 
 .inline-form input {
@@ -1583,25 +1593,36 @@ select:focus {
 }
 
 .panel-heading h2 {
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.35rem;
 }
 
 .panel-sub {
-  margin: 0 0 1rem;
+  margin: 0 0 1.15rem;
   font-size: 0.95rem;
 }
 
 .book-hero-layout {
   display: grid;
   grid-template-columns: 160px 1fr;
-  gap: 1.5rem;
+  gap: 1.75rem;
   align-items: start;
+}
+
+.book-hero-copy {
+  display: grid;
+  gap: 0.9rem;
+  align-content: start;
+}
+
+.book-hero-copy > .muted {
+  margin: 0;
 }
 
 .cover-stage {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.9rem;
   justify-items: start;
+  width: 100%;
 }
 
 .cover-preview-lg {
@@ -1622,15 +1643,32 @@ select:focus {
 .book-hero-actions,
 .reorder-controls,
 .share-actions,
-.note-editor-actions {
+.note-editor-actions,
+.page-header-actions,
+.settings-actions,
+.refine-actions,
+.modal-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.75rem;
   align-items: center;
 }
 
 .cover-actions {
-  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.65rem;
+  width: 140px;
+  margin: 0;
+}
+
+.cover-actions .btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.book-hero-actions {
+  margin-top: 0.15rem;
+  padding-top: 0.15rem;
 }
 
 .cover-picker-sheet {
@@ -1645,8 +1683,8 @@ select:focus {
 .cover-source-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.45rem;
-  margin-bottom: 0.55rem;
+  gap: 0.55rem;
+  margin-bottom: 0.75rem;
 }
 
 .cover-source-tab {
@@ -1764,7 +1802,7 @@ select:focus {
 
 
 .book-hero-copy h1 {
-  margin-top: 0;
+  margin: 0;
 }
 
 .list-item.is-dragging {
@@ -1825,7 +1863,7 @@ select:focus {
 }
 
 .note-create-form {
-  margin-top: 1.25rem;
+  margin-top: 1.35rem;
 }
 
 .note-page .note-editor-panel {
@@ -1839,7 +1877,7 @@ select:focus {
   justify-content: space-between;
   align-items: start;
   flex-wrap: wrap;
-  margin-bottom: 1rem;
+  margin-bottom: 1.15rem;
 }
 
 .note-title-input {
@@ -1975,8 +2013,8 @@ select:focus {
 .editor-toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
-  padding: 0.65rem 0.75rem;
+  gap: 0.45rem;
+  padding: 0.75rem 0.85rem;
   border-bottom: 1px solid var(--border);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(241, 245, 249, 0.9));
 }
@@ -2127,8 +2165,8 @@ select:focus {
 .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 0.65rem;
-  margin-top: 1.25rem;
+  gap: 0.75rem;
+  margin-top: 1.35rem;
 }
 
 .sr-only {
@@ -2274,8 +2312,8 @@ select:focus {
 .refine-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
+  gap: 0.75rem;
+  margin-top: 1rem;
 }
 
 .stale-banner {
@@ -2475,8 +2513,9 @@ select:focus {
 
 .search-form {
   display: flex;
-  gap: 0.65rem;
+  gap: 0.75rem;
   flex-wrap: wrap;
+  align-items: center;
   margin-bottom: 1.5rem;
 }
 
@@ -2614,8 +2653,8 @@ select:focus {
 .settings-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.65rem;
-  margin-top: 1rem;
+  gap: 0.75rem;
+  margin-top: 1.15rem;
 }
 
 .checkbox-row {
