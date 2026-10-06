@@ -17,7 +17,7 @@ Use after a clean install (Compose recommended). Mark each item when verified.
 - [ ] `GET /api/v1/health/ready` → `200` with `database=UP` when Postgres is up
 - [ ] Compose marks `api` healthy via readiness probe
 - [ ] Volumes persist across `docker compose down` / `up` (notes and covers remain)
-- [ ] Postgres/Ollama ports are not world-exposed (loopback bind)
+- [ ] Postgres/Ollama are not world-exposed by default (API-only publish)
 
 ## Core product (Phases 1–5)
 

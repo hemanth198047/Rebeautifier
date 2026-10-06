@@ -3,8 +3,17 @@
 #
 #   docker compose -f docker-compose.yml -f docker-compose.host-gateway.yml up --build
 #
-# Requires published host ports for db (and ollama when using --profile ai).
+# Publishes DB/Ollama on all host interfaces so host-gateway can reach them
+# (the base compose binds those ports to 127.0.0.1 only).
 services:
+  db:
+    ports:
+      - "5432:5432"
+
+  ollama:
+    ports:
+      - "11434:11434"
+
   api:
     extra_hosts:
       - "db:host-gateway"

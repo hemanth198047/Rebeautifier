@@ -44,7 +44,7 @@ Default model `llama3.2:1b` targets ~4 GB RAM hosts with concurrency `1`. Notes 
 - Copy `.env.example` → `.env` and set a strong `POSTGRES_PASSWORD`.
 - For non-demo installs: `SEED_DEMO_DATA=false` and `SPRING_PROFILES_ACTIVE=prod`.
 - Behind HTTPS: `SESSION_COOKIE_SECURE=true`.
-- Postgres and Ollama ports bind to `127.0.0.1` only; the public surface is the API port (`8080` by default).
+- Postgres and Ollama are not published to the host by default (API uses the Compose network). Use `docker compose exec db pg_dump …` for dumps. The public surface is the API port (`8080` by default).
 - Health probes: `GET /api/v1/health` (liveness) and `GET /api/v1/health/ready` (readiness; HTTP 503 if DB is down).
 
 ### Nested Docker / host-gateway override
@@ -111,8 +111,8 @@ Settings → **Backup**, or `/backup`:
 ### Host-level (full install)
 
 ```bash
-# Postgres dump (Compose publishes 127.0.0.1:5432)
-docker compose exec db pg_dump -U rebeautifier rebeautifier > rebeautifier-$(date +%F).sql
+# Postgres dump (Compose — no host DB port by default)
+docker compose exec -T db pg_dump -U rebeautifier rebeautifier > rebeautifier-$(date +%F).sql
 
 # Covers volume (example: copy from named volume)
 docker run --rm -v rebeautifier_covers:/from -v "$PWD":/to alpine \

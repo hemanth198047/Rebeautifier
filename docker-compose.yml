@@ -5,9 +5,8 @@ services:
       POSTGRES_DB: rebeautifier
       POSTGRES_USER: rebeautifier
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rebeautifier}
-    # Bind to loopback only — for host-side pg_dump / local tooling.
-    ports:
-      - "127.0.0.1:5432:5432"
+    # No host port publish by default (API reaches db over the Compose network).
+    # For host-side pg_dump: docker compose exec db pg_dump -U rebeautifier rebeautifier
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -20,8 +19,6 @@ services:
   ollama:
     image: ollama/ollama:latest
     profiles: ["ai"]
-    ports:
-      - "127.0.0.1:11434:11434"
     volumes:
       - ollama:/root/.ollama
     restart: unless-stopped
