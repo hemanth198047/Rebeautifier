@@ -4,7 +4,6 @@ import com.rebeautifier.service.AiSettingsService;
 import com.rebeautifier.web.dto.AiPullResponse;
 import com.rebeautifier.web.dto.AiSettingsResponse;
 import com.rebeautifier.web.dto.UpdateAiSettingsRequest;
-import com.rebeautifier.web.error.ApiException;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,24 +27,18 @@ public class AiSettingsController {
         return aiSettingsService.getForCurrentUser();
     }
 
+    /**
+     * Persist AI settings only. Model pull is never done in this request — a long
+     * Ollama download would make Save look broken (browser/proxy timeouts). Clients
+     * that want pull-on-save should call {@code POST /pull-model} after a successful save.
+     */
     @PutMapping
     public AiSettingsResponse save(@Valid @RequestBody UpdateAiSettingsRequest request) {
-        // Commit settings first (separate transaction boundary via service method return).
         AiSettingsResponse saved = aiSettingsService.saveForCurrentUser(request);
-
-        boolean wantPull = Boolean.TRUE.equals(request.pullModelOnSave())
+        if (Boolean.TRUE.equals(request.pullModelOnSave())
                 && Boolean.TRUE.equals(request.enabled())
                 && request.provider() != null
-                && "OLLAMA".equals(request.provider().name());
-
-        if (!wantPull) {
-            return saved;
-        }
-
-        try {
-            AiPullResponse pull = aiSettingsService.pullModelForCurrentUser();
-            String msg = pull.message()
-                    + (pull.nextStep() != null ? " " + pull.nextStep() : "");
+                && "OLLAMA".equals(request.provider().name())) {
             return new AiSettingsResponse(
                     saved.enabled(),
                     saved.provider(),
@@ -53,22 +46,11 @@ public class AiSettingsController {
                     saved.baseUrl(),
                     saved.apiKeyConfigured(),
                     saved.apiKeyHint(),
-                    msg,
-                    saved.updatedAt()
-            );
-        } catch (ApiException ex) {
-            // Keep the saved enablement; surface pull failure as guidance, not a rollback.
-            return new AiSettingsResponse(
-                    saved.enabled(),
-                    saved.provider(),
-                    saved.model(),
-                    saved.baseUrl(),
-                    saved.apiKeyConfigured(),
-                    saved.apiKeyHint(),
-                    "AI settings saved, but model pull failed: " + ex.getMessage(),
+                    "AI settings saved. Start the model download with Pull model now (Save no longer waits on pull).",
                     saved.updatedAt()
             );
         }
+        return saved;
     }
 
     @PostMapping("/pull-model")
