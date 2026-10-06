@@ -1,4 +1,4 @@
-':root {
+:root {
   --primary: #1e293b;
   --secondary: #334155;
   --accent: #f59e0b;
@@ -142,7 +142,7 @@ button {
     linear-gradient(180deg, rgba(30, 41, 59, 0.88), rgba(15, 23, 42, 0.94)),
     radial-gradient(circle at 30% 20%, rgba(245, 158, 11, 0.28), transparent 45%),
     linear-gradient(145deg, #1e293b, #0f172a),
-    url("data:image/svg+xml,%3Csvg width='160' height='160' viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%2394a3b8' stroke-opacity='0.22'%3E%3Cpath d='M0 80h160M80 0v160'/%3E%3C/g%3E%3C/svg%3E");
+    url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22160%22 height=%22160%22 viewBox=%220 0 160 160%22%3E%3Cg fill=%22none%22 stroke=%22%2394a3b8%22 stroke-opacity=%220.22%22%3E%3Cpath d=%22M0 80h160M80 0v160%22/%3E%3C/g%3E%3C/svg%3E");
 }
 
 .hero-panel::after {
