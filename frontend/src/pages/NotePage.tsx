@@ -39,6 +39,7 @@ export function NotePage() {
   const dirtyRef = useRef(false)
   const versionRef = useRef(1)
   const autosaveTimer = useRef<number | null>(null)
+  const saveFeedbackTimer = useRef<number | null>(null)
   const latestPayload = useRef({
     title: '',
     bodyRich: '',
@@ -117,10 +118,14 @@ export function NotePage() {
         })
         applyNote(updated)
         setSaveState('saved')
+        if (saveFeedbackTimer.current) window.clearTimeout(saveFeedbackTimer.current)
         // Keep "Saved" visible long enough that the button + banner are noticeable.
-        window.setTimeout(() => {
+        // Manual saves stay visible longer; clear any prior timer so autosave cannot
+        // wipe a later manual "Saved" state early.
+        saveFeedbackTimer.current = window.setTimeout(() => {
+          saveFeedbackTimer.current = null
           if (!dirtyRef.current) setSaveState('idle')
-        }, opts?.manual ? 2800 : 1600)
+        }, opts?.manual ? 3200 : 1800)
         return updated
       } catch (err) {
         dirtyRef.current = true
@@ -149,6 +154,7 @@ export function NotePage() {
   useEffect(() => {
     return () => {
       if (autosaveTimer.current) window.clearTimeout(autosaveTimer.current)
+      if (saveFeedbackTimer.current) window.clearTimeout(saveFeedbackTimer.current)
     }
   }, [])
 
@@ -257,13 +263,18 @@ export function NotePage() {
 
         {error && <div className="error-banner">{error}</div>}
         {saveState === 'saved' && (
-          <div className="success-banner" role="status" aria-live="polite">
+          <div className="success-banner save-success-banner" role="status" aria-live="polite">
             Note saved
           </div>
         )}
         {saveState === 'failed' && !error && (
           <div className="error-banner" role="alert">
             Save failed — try again
+          </div>
+        )}
+        {saveState === 'saving' && (
+          <div className="info-banner" role="status" aria-live="polite">
+            Saving note…
           </div>
         )}
 
