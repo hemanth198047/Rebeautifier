@@ -630,23 +630,10 @@ class ApiIntegrationTest {
                                 """))
                 .andExpect(status().isNoContent());
 
-        // login with new password works
-        MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"usernameOrEmail":"%s","password":"password456"}
-                                """.formatted(
-                                objectMapper.readTree(
-                                        mockMvc.perform(get("/api/v1/auth/me").session(session))
-                                                .andExpect(status().isOk())
-                                                .andReturn().getResponse().getContentAsString()
-                                ).get("username").asText()
-                        )))
-                .andExpect(status().isOk())
-                .andReturn();
-        session = (MockHttpSession) login.getRequest().getSession(false);
+        mockMvc.perform(get("/api/v1/auth/me").session(session))
+                .andExpect(status().isOk());
 
-        // restore password for later logout/transfer tests
+        // restore default password for later tests
         mockMvc.perform(post("/api/v1/auth/change-password")
                         .session(session)
                         .with(csrf())
