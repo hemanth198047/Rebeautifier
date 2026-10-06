@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { api, ApiError, type Book } from '../api'
 import { useAuth } from '../auth'
 import { AiStatusChip } from '../components/AiStatusChip'
+import { useDialog } from '../components/DialogProvider'
 
 function readCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`))
@@ -17,6 +18,7 @@ async function ensureCsrf(): Promise<void> {
 
 export function BackupPage() {
   const { user, logout } = useAuth()
+  const { confirm } = useDialog()
   const [books, setBooks] = useState<Book[]>([])
   const [bookId, setBookId] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -80,7 +82,15 @@ export function BackupPage() {
         if (!owned || owned.myRole !== 'OWNER') {
           throw new ApiError(403, 'FORBIDDEN', 'You can only replace books you own')
         }
-        if (!confirm(`Replace all content in “${owned.title}”? Collaborators stay; notes/chapters are overwritten.`)) {
+        if (
+          !(await confirm({
+            title: 'Replace book content',
+            message: `Replace all content in “${owned.title}”? Collaborators stay; notes and chapters are overwritten.`,
+            confirmLabel: 'Replace content',
+            cancelLabel: 'Cancel',
+            danger: true,
+          }))
+        ) {
           setBusy(false)
           return
         }

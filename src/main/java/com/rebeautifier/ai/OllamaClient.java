@@ -25,6 +25,8 @@ public class OllamaClient {
     private final String defaultBaseUrl;
     private final String defaultModel;
     private final Duration timeout;
+    private final int numPredict;
+    private final String keepAlive;
     private final boolean mockEnabled;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
@@ -32,15 +34,19 @@ public class OllamaClient {
     public OllamaClient(@Value("${rebeautifier.ollama.base-url:http://localhost:11434}") String baseUrl,
                         @Value("${rebeautifier.ollama.model:llama3.2:1b}") String model,
                         @Value("${rebeautifier.ollama.timeout-seconds:90}") long timeoutSeconds,
+                        @Value("${rebeautifier.ollama.num-predict:1024}") int numPredict,
+                        @Value("${rebeautifier.ollama.keep-alive:30m}") String keepAlive,
                         @Value("${rebeautifier.ollama.mock-enabled:false}") boolean mockEnabled,
                         ObjectMapper objectMapper) {
         this.defaultBaseUrl = trimTrailingSlash(baseUrl);
         this.defaultModel = model;
         this.timeout = Duration.ofSeconds(timeoutSeconds);
+        this.numPredict = Math.max(256, numPredict);
+        this.keepAlive = keepAlive == null || keepAlive.isBlank() ? "30m" : keepAlive.trim();
         this.mockEnabled = mockEnabled;
         this.objectMapper = objectMapper;
         this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(5))
+                .connectTimeout(Duration.ofSeconds(3))
                 .build();
     }
 
@@ -78,7 +84,7 @@ public class OllamaClient {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "/api/tags"))
-                    .timeout(Duration.ofSeconds(4))
+                    .timeout(Duration.ofSeconds(2))
                     .GET()
                     .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -132,11 +138,12 @@ public class OllamaClient {
             ObjectNode body = objectMapper.createObjectNode();
             body.put("model", config.model());
             body.put("stream", false);
+            body.put("keep_alive", keepAlive);
             body.put("system", systemPrompt);
             body.put("prompt", userPrompt);
             ObjectNode options = body.putObject("options");
             options.put("temperature", 0.2);
-            options.put("num_predict", 2048);
+            options.put("num_predict", numPredict);
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "/api/generate"))
@@ -158,6 +165,7 @@ public class OllamaClient {
         } catch (OllamaException ex) {
             throw ex;
         } catch (Exception ex) {
+            OllamaUrlResolver.invalidate(config.baseUrl());
             if (OllamaUrlResolver.looksLikeDnsFailure(ex)) {
                 throw new OllamaException(OllamaUrlResolver.unresolvedHint(baseUrl), ex);
             }

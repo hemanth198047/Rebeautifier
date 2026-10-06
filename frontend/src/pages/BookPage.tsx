@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, ApiError, type Book, type Chapter, type Note } from '../api'
 import { useAuth } from '../auth'
+import { useDialog } from '../components/DialogProvider'
 import { NotesPanel } from '../components/NotesPanel'
 import { ShareDialog } from '../components/ShareDialog'
 
@@ -9,6 +10,7 @@ export function BookPage() {
   const { bookId = '' } = useParams()
   const navigate = useNavigate()
   const { logout, user } = useAuth()
+  const { confirm } = useDialog()
   const [book, setBook] = useState<Book | null>(null)
   const [chapters, setChapters] = useState<Chapter[]>([])
   const [notes, setNotes] = useState<Note[]>([])
@@ -110,7 +112,14 @@ export function BookPage() {
   }
 
   async function deleteBook() {
-    if (!confirm('Delete this book and its chapters?')) return
+    const ok = await confirm({
+      title: 'Delete book',
+      message: 'Delete this book and its chapters? This cannot be undone.',
+      confirmLabel: 'Delete book',
+      cancelLabel: 'Cancel',
+      danger: true,
+    })
+    if (!ok) return
     try {
       await api(`/api/v1/books/${bookId}`, { method: 'DELETE' })
       navigate('/library')

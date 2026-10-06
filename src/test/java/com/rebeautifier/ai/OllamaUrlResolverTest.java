@@ -37,10 +37,22 @@ class OllamaUrlResolverTest {
 
     @Test
     void findReachableReturnsACandidateFromTheList() {
+        OllamaUrlResolver.clearCache();
         HttpClient client = HttpClient.newHttpClient();
         String preferred = "http://definitely-not-a-real-ollama-host.invalid:11434";
         String resolved = OllamaUrlResolver.findReachable(client, preferred);
         assertTrue(OllamaUrlResolver.candidates(preferred).contains(resolved));
+    }
+
+    @Test
+    void findReachableCachesSuccessfulLookup() {
+        OllamaUrlResolver.clearCache();
+        HttpClient client = HttpClient.newHttpClient();
+        // Prefer a likely-local candidate from this environment; cache should still return the same URL.
+        String preferred = "http://127.0.0.1:11434";
+        String first = OllamaUrlResolver.findReachable(client, preferred);
+        String second = OllamaUrlResolver.findReachable(client, preferred);
+        assertEquals(first, second);
     }
 
     @Test

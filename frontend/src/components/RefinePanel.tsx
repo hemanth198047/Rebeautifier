@@ -10,6 +10,7 @@ import {
   type RevisionStatus,
 } from '../api'
 import { RichTextEditor } from './RichTextEditor'
+import { useDialog } from './DialogProvider'
 
 const MODES: { mode: RefineMode; label: string; hint: string }[] = [
   { mode: 'GRAMMAR', label: 'Grammar', hint: 'Polish grammar and readability' },
@@ -48,6 +49,7 @@ export function RefinePanel({
   onEnsureSaved,
   onNoteUpdated,
 }: Props) {
+  const { confirm } = useDialog()
   const [aiStatus, setAiStatus] = useState<AiStatus | null>(null)
   const [revisions, setRevisions] = useState<NoteRevision[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -146,7 +148,13 @@ export function RefinePanel({
       setError('This refinement is stale. Regenerate it against the current note before accepting.')
       return
     }
-    if (!window.confirm('Accept this refinement into the working note? The original capture stays preserved.')) {
+    const ok = await confirm({
+      title: 'Accept refinement',
+      message: 'Accept this refinement into the working note? The original capture stays preserved.',
+      confirmLabel: 'Accept into note',
+      cancelLabel: 'Cancel',
+    })
+    if (!ok) {
       return
     }
     setBusy(true)

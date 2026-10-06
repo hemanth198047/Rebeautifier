@@ -43,6 +43,8 @@ rebeautifier:
     base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
     model: ${OLLAMA_MODEL:llama3.2:1b}
     timeout-seconds: ${OLLAMA_TIMEOUT_SECONDS:90}
+    num-predict: ${OLLAMA_NUM_PREDICT:1024}
+    keep-alive: ${OLLAMA_KEEP_ALIVE:30m}
     max-concurrent: ${OLLAMA_MAX_CONCURRENT:1}
     mock-enabled: ${OLLAMA_MOCK_ENABLED:false}
 
