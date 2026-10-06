@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, ApiError, type Book, type Chapter, type Note } from '../api'
 import { useAuth } from '../auth'
 import { useDialog } from '../components/DialogProvider'
+import { CoverPickerDialog } from '../components/CoverPickerDialog'
 import { NotesPanel } from '../components/NotesPanel'
 import { ShareDialog } from '../components/ShareDialog'
 
@@ -17,6 +18,7 @@ export function BookPage() {
   const [title, setTitle] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [shareOpen, setShareOpen] = useState(false)
+  const [coverPickerOpen, setCoverPickerOpen] = useState(false)
   const [dragChapterId, setDragChapterId] = useState<string | null>(null)
   const canEdit = book?.myRole === 'OWNER' || book?.myRole === 'EDITOR'
   const isOwner = book?.myRole === 'OWNER'
@@ -164,8 +166,11 @@ export function BookPage() {
                 )}
                 {canEdit && (
                   <div className="cover-actions">
+                    <button className="btn btn-primary" type="button" onClick={() => setCoverPickerOpen(true)}>
+                      Browse free covers
+                    </button>
                     <label className="btn btn-ghost">
-                      {book.coverUrl ? 'Replace cover' : 'Upload cover'}
+                      {book.coverUrl ? 'Upload file' : 'Upload cover'}
                       <input
                         type="file"
                         accept="image/png,image/jpeg,image/webp,image/gif"
@@ -266,6 +271,15 @@ export function BookPage() {
 
       {isOwner && (
         <ShareDialog bookId={bookId} open={shareOpen} onClose={() => setShareOpen(false)} />
+      )}
+      {canEdit && (
+        <CoverPickerDialog
+          bookId={bookId}
+          bookTitle={book?.title}
+          open={coverPickerOpen}
+          onClose={() => setCoverPickerOpen(false)}
+          onApplied={() => void load()}
+        />
       )}
     </div>
   )

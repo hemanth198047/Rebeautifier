@@ -169,7 +169,8 @@ Then visit http://localhost:8080 → sign in as `reader` / `password123` → ope
 | Area | Endpoints |
 | --- | --- |
 | Auth | `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET/PATCH /auth/me`, `POST /auth/change-password`, `GET /auth/csrf` |
-| Books | CRUD + `PUT/DELETE .../cover` + members |
+| Books | CRUD + `PUT/DELETE .../cover` + `PUT .../cover/from-free-image` + members |
+| Cover images | `GET /cover-images/sources`, `GET /cover-images/search` (Openverse, Lorem Picsum, Wikimedia Commons) |
 | Chapters | list/create/reorder under book; patch/delete by id |
 | Sections | list/create/reorder under chapter; patch/delete by id |
 | Notes | list/create under book; get/patch/delete by id; reorder; draft/saved + content_version |

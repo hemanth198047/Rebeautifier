@@ -36,6 +36,10 @@ rebeautifier:
   cors-origins: ${CORS_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
   cover-storage-path: ${COVER_STORAGE_PATH:./data/covers}
   seed-demo-data: ${SEED_DEMO_DATA:true}
+  free-covers:
+    openverse-base-url: ${OPENVERSE_BASE_URL:https://api.openverse.org}
+    picsum-base-url: ${PICSUM_BASE_URL:https://picsum.photos}
+    wikimedia-api-url: ${WIKIMEDIA_API_URL:https://commons.wikimedia.org/w/api.php}
   rate-limit:
     auth-per-minute: ${RATE_LIMIT_AUTH_PER_MINUTE:30}
     ai-per-minute: ${RATE_LIMIT_AI_PER_MINUTE:20}

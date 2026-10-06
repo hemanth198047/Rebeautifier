@@ -3,6 +3,7 @@ package com.rebeautifier.service;
 import com.rebeautifier.domain.Book;
 import com.rebeautifier.domain.BookMember;
 import com.rebeautifier.domain.BookRole;
+import com.rebeautifier.domain.FreeImageSource;
 import com.rebeautifier.domain.User;
 import com.rebeautifier.repository.BookMemberRepository;
 import com.rebeautifier.repository.BookRepository;
@@ -12,6 +13,7 @@ import com.rebeautifier.web.dto.BookResponse;
 import com.rebeautifier.web.dto.BookUpdateRequest;
 import com.rebeautifier.web.dto.MemberAddRequest;
 import com.rebeautifier.web.dto.MemberResponse;
+import com.rebeautifier.web.dto.SetCoverFromFreeImageRequest;
 import com.rebeautifier.web.error.ApiException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +30,7 @@ public class BookService {
     private final UserRepository userRepository;
     private final AccessControlService accessControlService;
     private final CoverStorageService coverStorageService;
+    private final FreeCoverImageService freeCoverImageService;
     private final AuthService authService;
 
     public BookService(BookRepository bookRepository,
@@ -35,12 +38,14 @@ public class BookService {
                        UserRepository userRepository,
                        AccessControlService accessControlService,
                        CoverStorageService coverStorageService,
+                       FreeCoverImageService freeCoverImageService,
                        AuthService authService) {
         this.bookRepository = bookRepository;
         this.bookMemberRepository = bookMemberRepository;
         this.userRepository = userRepository;
         this.accessControlService = accessControlService;
         this.coverStorageService = coverStorageService;
+        this.freeCoverImageService = freeCoverImageService;
         this.authService = authService;
     }
 
@@ -108,6 +113,22 @@ public class BookService {
         Book book = accessControlService.requireBook(bookId);
         coverStorageService.deleteIfPresent(book.getCoverStorageKey());
         CoverStorageService.StoredCover stored = coverStorageService.store(bookId, file);
+        book.setCoverStorageKey(stored.storageKey());
+        book.setCoverMime(stored.mimeType());
+        return toResponse(book, user);
+    }
+
+    @Transactional
+    public BookResponse setCoverFromFreeImage(UUID bookId, SetCoverFromFreeImageRequest request) {
+        User user = authService.requireCurrentUser();
+        accessControlService.requireRole(bookId, user, AccessControlService.editors());
+        Book book = accessControlService.requireBook(bookId);
+        FreeImageSource source = request.source();
+        FreeCoverImageService.DownloadedImage downloaded =
+                freeCoverImageService.downloadForCover(source, request.imageId(), request.imageUrl());
+        coverStorageService.deleteIfPresent(book.getCoverStorageKey());
+        CoverStorageService.StoredCover stored =
+                coverStorageService.storeBytes(bookId, downloaded.mimeType(), downloaded.bytes());
         book.setCoverStorageKey(stored.storageKey());
         book.setCoverMime(stored.mimeType());
         return toResponse(book, user);

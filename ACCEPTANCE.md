@@ -33,6 +33,7 @@ Use after a clean install (Compose recommended). Mark each item when verified.
 
 ## Settings / release
 
+- [ ] Book cover: upload file, browse free covers (Openverse / Picsum / Wikimedia), remove cover
 - [ ] JSON backup schema v2 includes cover when present; v1 backups still import
 - [ ] Search returns ranked FTS hits (substring fallback still works)
 - [ ] GitHub Actions CI workflow is present under `.github/workflows/ci.yml`

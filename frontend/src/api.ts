@@ -19,6 +19,37 @@ export type Book = {
   updatedAt: string
 }
 
+export type FreeCoverImageSource = 'OPENVERSE' | 'PICSUM' | 'WIKIMEDIA'
+
+export type FreeCoverImageSourceInfo = {
+  id: FreeCoverImageSource
+  label: string
+  blurb: string
+}
+
+export type FreeCoverImageHit = {
+  source: FreeCoverImageSource
+  imageId: string
+  title: string | null
+  thumbnailUrl: string
+  fullUrl: string
+  creator: string | null
+  license: string | null
+  attribution: string | null
+  landingUrl: string | null
+  width: number | null
+  height: number | null
+}
+
+export type FreeCoverImageSearchResponse = {
+  query: string
+  source: string
+  page: number
+  pageSize: number
+  resultCount: number | null
+  results: FreeCoverImageHit[]
+}
+
 export type Chapter = {
   id: string
   bookId: string

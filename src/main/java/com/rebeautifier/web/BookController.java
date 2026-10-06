@@ -7,6 +7,7 @@ import com.rebeautifier.web.dto.BookResponse;
 import com.rebeautifier.web.dto.BookUpdateRequest;
 import com.rebeautifier.web.dto.MemberAddRequest;
 import com.rebeautifier.web.dto.MemberResponse;
+import com.rebeautifier.web.dto.SetCoverFromFreeImageRequest;
 import com.rebeautifier.web.dto.TransferOwnershipRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -68,6 +69,12 @@ public class BookController {
     @PutMapping(value = "/{bookId}/cover", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public BookResponse uploadCover(@PathVariable UUID bookId, @RequestPart("file") MultipartFile file) {
         return bookService.uploadCover(bookId, file);
+    }
+
+    @PutMapping(value = "/{bookId}/cover/from-free-image", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public BookResponse setCoverFromFreeImage(@PathVariable UUID bookId,
+                                              @Valid @RequestBody SetCoverFromFreeImageRequest request) {
+        return bookService.setCoverFromFreeImage(bookId, request);
     }
 
     @DeleteMapping("/{bookId}/cover")
