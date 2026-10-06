@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError, type AiStatus } from '../api'
 import { useAuth } from '../auth'
@@ -20,6 +20,10 @@ export function SettingsPage() {
   const [health, setHealth] = useState<Health | null>(null)
   const [ready, setReady] = useState<Ready | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [passwordMsg, setPasswordMsg] = useState<string | null>(null)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [passwordBusy, setPasswordBusy] = useState(false)
 
   async function refresh() {
     setError(null)
@@ -40,6 +44,26 @@ export function SettingsPage() {
   useEffect(() => {
     void refresh()
   }, [])
+
+  async function onChangePassword(event: FormEvent) {
+    event.preventDefault()
+    setPasswordBusy(true)
+    setPasswordMsg(null)
+    setError(null)
+    try {
+      await api('/api/v1/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword }),
+      })
+      setCurrentPassword('')
+      setNewPassword('')
+      setPasswordMsg('Password updated')
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not change password')
+    } finally {
+      setPasswordBusy(false)
+    }
+  }
 
   return (
     <div className="app-shell">
@@ -77,6 +101,7 @@ export function SettingsPage() {
         </div>
 
         {error && <div className="error-banner">{error}</div>}
+        {passwordMsg && <div className="success-banner">{passwordMsg}</div>}
 
         <section className="settings-grid">
           <article className="settings-panel">
@@ -95,6 +120,34 @@ export function SettingsPage() {
                 <dd>{user?.email}</dd>
               </div>
             </dl>
+            <form className="form-stack password-form" onSubmit={(e) => void onChangePassword(e)}>
+              <h3>Change password</h3>
+              <label>
+                Current password
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  required
+                  minLength={8}
+                />
+              </label>
+              <label>
+                New password
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  minLength={8}
+                />
+              </label>
+              <button className="btn btn-primary" type="submit" disabled={passwordBusy}>
+                {passwordBusy ? 'Updating…' : 'Update password'}
+              </button>
+            </form>
             <p className="muted settings-note">
               Accounts are local to this installation. There is no cloud login.
             </p>
@@ -133,9 +186,7 @@ export function SettingsPage() {
             <h2>Local AI (Ollama)</h2>
             <div className="ai-status-block">
               <AiStatusChip />
-              <p className="muted">
-                {ai?.message ?? 'Checking Ollama…'}
-              </p>
+              <p className="muted">{ai?.message ?? 'Checking Ollama…'}</p>
             </div>
             <dl className="settings-dl">
               <div>
@@ -150,20 +201,38 @@ export function SettingsPage() {
               </div>
               <div>
                 <dt>Concurrency</dt>
-                <dd>
-                  {ai ? `${ai.inFlight} in flight / max ${ai.maxConcurrent}` : '—'}
-                </dd>
+                <dd>{ai ? `${ai.inFlight} in flight / max ${ai.maxConcurrent}` : '—'}</dd>
               </div>
               <div>
                 <dt>Models seen</dt>
                 <dd>{ai?.models?.length ? ai.models.join(', ') : 'none detected'}</dd>
+              </div>
+              <div>
+                <dt>Refine attempts</dt>
+                <dd>{ai?.metricsAttempts ?? 0}</dd>
+              </div>
+              <div>
+                <dt>Succeeded / failed</dt>
+                <dd>
+                  {ai ? `${ai.metricsSucceeded} / ${ai.metricsFailed}` : '—'}
+                </dd>
+              </div>
+              <div>
+                <dt>Avg refine latency</dt>
+                <dd>{ai ? `${ai.metricsAverageLatencyMs} ms` : '—'}</dd>
               </div>
             </dl>
             {ai && !ai.available && (
               <div className="setup-hint">
                 <h3>Setup steps</h3>
                 <ol>
-                  <li>Install Ollama from <a href="https://ollama.com" target="_blank" rel="noreferrer">ollama.com</a>.</li>
+                  <li>
+                    Install Ollama from{' '}
+                    <a href="https://ollama.com" target="_blank" rel="noreferrer">
+                      ollama.com
+                    </a>
+                    .
+                  </li>
                   <li>
                     Start with AI: <code>docker compose --profile ai up --build</code>
                   </li>
@@ -171,7 +240,9 @@ export function SettingsPage() {
                     Pull the default model:{' '}
                     <code>docker compose --profile ai exec ollama ollama pull llama3.2:1b</code>
                   </li>
-                  <li>Or set <code>OLLAMA_BASE_URL</code> / <code>OLLAMA_MODEL</code> in <code>.env</code>.</li>
+                  <li>
+                    Or set <code>OLLAMA_BASE_URL</code> / <code>OLLAMA_MODEL</code> in <code>.env</code>.
+                  </li>
                 </ol>
                 {ai.setupHint && <p className="muted">{ai.setupHint}</p>}
                 <p className="muted">

@@ -1,10 +1,11 @@
 package com.rebeautifier.web;
 
-import com.rebeautifier.service.AuthService;
-import com.rebeautifier.service.RateLimitService;
+import com.rebeautifier.web.dto.ChangePasswordRequest;
 import com.rebeautifier.web.dto.LoginRequest;
 import com.rebeautifier.web.dto.RegisterRequest;
 import com.rebeautifier.web.dto.UserResponse;
+import com.rebeautifier.service.AuthService;
+import com.rebeautifier.service.RateLimitService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -57,6 +58,12 @@ public class AuthController {
     @GetMapping("/me")
     public UserResponse me() {
         return authService.me();
+    }
+
+    @PostMapping("/change-password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        authService.changePassword(request.currentPassword(), request.newPassword());
     }
 
     @GetMapping("/csrf")

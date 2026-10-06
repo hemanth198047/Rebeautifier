@@ -543,6 +543,8 @@ class ApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
         assertThat(mdExport.getResponse().getContentAsString()).contains("# Integration Book");
+        assertThat(mdExport.getResponse().getContentAsString()).contains("Cover image is present");
+        assertThat(mdExport.getResponse().getContentAsString()).contains("JSON export");
         MvcResult jsonExport = mockMvc.perform(get("/api/v1/books/" + bookId + "/export")
                         .session(session)
                         .param("format", "json"))
@@ -602,6 +604,61 @@ class ApiIntegrationTest {
 
     @Test
     @Order(10)
+    void changePasswordAndAiMetrics() throws Exception {
+        mockMvc.perform(get("/api/v1/system/ai-status").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.metricsAttempts").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)))
+                .andExpect(jsonPath("$.metricsSucceeded").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)))
+                .andExpect(jsonPath("$.metricsFailed").exists())
+                .andExpect(jsonPath("$.metricsAverageLatencyMs").exists());
+
+        mockMvc.perform(post("/api/v1/auth/change-password")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"wrong-password","newPassword":"password456"}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/v1/auth/change-password")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"password123","newPassword":"password456"}
+                                """))
+                .andExpect(status().isNoContent());
+
+        // login with new password works
+        MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"usernameOrEmail":"%s","password":"password456"}
+                                """.formatted(
+                                objectMapper.readTree(
+                                        mockMvc.perform(get("/api/v1/auth/me").session(session))
+                                                .andExpect(status().isOk())
+                                                .andReturn().getResponse().getContentAsString()
+                                ).get("username").asText()
+                        )))
+                .andExpect(status().isOk())
+                .andReturn();
+        session = (MockHttpSession) login.getRequest().getSession(false);
+
+        // restore password for later logout/transfer tests
+        mockMvc.perform(post("/api/v1/auth/change-password")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"password456","newPassword":"password123"}
+                                """))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @Order(11)
     void transferOwnershipToExistingUser() throws Exception {
         String suffix = UUID.randomUUID().toString().substring(0, 8);
         mockMvc.perform(post("/api/v1/auth/register")
@@ -631,7 +688,7 @@ class ApiIntegrationTest {
     }
 
     @Test
-    @Order(11)
+    @Order(12)
     void logoutClearsSession() throws Exception {
         mockMvc.perform(post("/api/v1/auth/logout").session(session).with(csrf()))
                 .andExpect(status().isNoContent());

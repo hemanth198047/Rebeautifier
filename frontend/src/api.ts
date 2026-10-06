@@ -105,6 +105,10 @@ export type AiStatus = {
   maxConcurrent: number
   models: string[]
   setupHint: string
+  metricsAttempts: number
+  metricsSucceeded: number
+  metricsFailed: number
+  metricsAverageLatencyMs: number
 }
 
 export type SearchHit = {

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rebeautifier.ai.AiConcurrencyGate;
+import com.rebeautifier.ai.AiMetrics;
 import com.rebeautifier.ai.OllamaClient;
 import com.rebeautifier.domain.Note;
 import com.rebeautifier.domain.NoteRevision;
@@ -50,6 +51,7 @@ public class RefinementService {
     private final ObjectMapper objectMapper;
     private final NoteService noteService;
     private final RateLimitService rateLimitService;
+    private final AiMetrics aiMetrics;
 
     public RefinementService(NoteRepository noteRepository,
                              NoteRevisionRepository noteRevisionRepository,
@@ -59,7 +61,8 @@ public class RefinementService {
                              AiConcurrencyGate concurrencyGate,
                              ObjectMapper objectMapper,
                              NoteService noteService,
-                             RateLimitService rateLimitService) {
+                             RateLimitService rateLimitService,
+                             AiMetrics aiMetrics) {
         this.noteRepository = noteRepository;
         this.noteRevisionRepository = noteRevisionRepository;
         this.accessControlService = accessControlService;
@@ -69,6 +72,7 @@ public class RefinementService {
         this.objectMapper = objectMapper;
         this.noteService = noteService;
         this.rateLimitService = rateLimitService;
+        this.aiMetrics = aiMetrics;
     }
 
     @Transactional(readOnly = true)
@@ -80,6 +84,7 @@ public class RefinementService {
         String setup = "Install Ollama from https://ollama.com, run `ollama pull "
                 + ollamaClient.configuredModel()
                 + "`, and set OLLAMA_BASE_URL if needed. Notes still work while AI is offline.";
+        AiMetrics.Snapshot metrics = aiMetrics.snapshot();
         return new AiStatusResponse(
                 available,
                 probe.reachable(),
@@ -91,7 +96,11 @@ public class RefinementService {
                 concurrencyGate.inFlight(),
                 concurrencyGate.maxConcurrent(),
                 probe.models(),
-                setup
+                setup,
+                metrics.attempts(),
+                metrics.succeeded(),
+                metrics.failed(),
+                metrics.averageLatencyMs()
         );
     }
 
@@ -160,6 +169,7 @@ public class RefinementService {
 
         noteRevisionRepository.saveAndFlush(revision);
 
+        long started = System.currentTimeMillis();
         try (AiConcurrencyGate.Permit ignored = concurrencyGate.acquire()) {
             String system = systemPrompt(request.mode());
             String userPrompt = userPrompt(request.mode(), source, plain, request.question());
@@ -176,8 +186,10 @@ public class RefinementService {
                 revision.setStatus(RevisionStatus.STALE);
             }
             noteRevisionRepository.save(revision);
-            log.info("Refinement {} mode={} status={} note={}", revision.getId(), revision.getMode(),
-                    revision.getStatus(), noteId);
+            long elapsed = System.currentTimeMillis() - started;
+            aiMetrics.recordSuccess(elapsed);
+            log.info("Refinement {} mode={} status={} note={} latencyMs={}", revision.getId(), revision.getMode(),
+                    revision.getStatus(), noteId, elapsed);
             return toResponse(revision, fresh);
         } catch (ApiException ex) {
             if ("AI_BUSY".equals(ex.getCode())) {
@@ -185,6 +197,7 @@ public class RefinementService {
                 revision.setErrorMessage(ex.getMessage());
                 revision.setFinalizedAt(Instant.now());
                 noteRevisionRepository.save(revision);
+                aiMetrics.recordFailure(System.currentTimeMillis() - started);
             }
             throw ex;
         } catch (OllamaClient.OllamaException ex) {
@@ -192,6 +205,7 @@ public class RefinementService {
             revision.setErrorMessage(ex.getMessage());
             revision.setFinalizedAt(Instant.now());
             noteRevisionRepository.save(revision);
+            aiMetrics.recordFailure(System.currentTimeMillis() - started);
             throw new ApiException("AI_FAILED", ex.getMessage(), HttpStatus.BAD_GATEWAY);
         }
     }

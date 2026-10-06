@@ -13,6 +13,10 @@ public record AiStatusResponse(
         int inFlight,
         int maxConcurrent,
         List<String> models,
-        String setupHint
+        String setupHint,
+        long metricsAttempts,
+        long metricsSucceeded,
+        long metricsFailed,
+        long metricsAverageLatencyMs
 ) {
 }

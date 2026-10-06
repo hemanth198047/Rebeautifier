@@ -1198,6 +1198,16 @@ select:focus {
   margin: 0 0 0.65rem;
 }
 
+.password-form {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(231, 240, 234, 0.1);
+}
+
+.password-form h3 {
+  color: var(--foam);
+}
+
 .settings-dl {
   display: grid;
   gap: 0.75rem;
