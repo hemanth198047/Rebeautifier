@@ -1056,6 +1056,15 @@ select:focus {
   background: var(--accent-soft);
 }
 
+.ai-chip.is-waiting {
+  border-color: rgba(59, 130, 246, 0.45);
+}
+
+.ai-chip.is-waiting .ai-chip-dot {
+  background: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+}
+
 .info-banner,
 .success-banner {
   padding: 0.75rem 0.9rem;

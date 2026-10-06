@@ -92,16 +92,22 @@ public class OllamaClient {
             if (modelsNode.isArray()) {
                 for (JsonNode m : modelsNode) {
                     String name = m.path("name").asText(null);
-                    if (name != null && !name.isBlank()) {
+                    if (name == null || name.isBlank()) {
+                        name = m.path("model").asText(null);
+                    }
+                    if (name != null && !name.isBlank() && !models.contains(name)) {
                         models.add(name);
                     }
                 }
             }
-            boolean hasModel = models.stream().anyMatch(n ->
-                    n.equals(config.model()) || n.startsWith(config.model() + ":") || n.startsWith(config.model()));
+            boolean hasModel = models.stream().anyMatch(n -> modelMatches(config.model(), n));
             String message = hasModel
-                    ? "Ollama reachable at " + baseUrl + "; model available"
-                    : "Ollama reachable at " + baseUrl + " but model '" + config.model() + "' not pulled yet";
+                    ? "Ollama reachable at " + baseUrl + "; model '" + config.model() + "' is available"
+                    : models.isEmpty()
+                    ? "Ollama reachable at " + baseUrl + " but no models are installed yet — pull '"
+                            + config.model() + "'"
+                    : "Ollama reachable at " + baseUrl + " but model '" + config.model()
+                            + "' is not installed. Installed: " + String.join(", ", models);
             return new AiStatusProbe(true, hasModel, message, latency, models);
         } catch (Exception ex) {
             long latency = System.currentTimeMillis() - started;
@@ -195,6 +201,17 @@ public class OllamaClient {
                     throw new OllamaException(classifyPullFailure(config.model(), baseUrl, registryErr));
                 }
             }
+            // Confirm the model actually appears in /api/tags — never report success on an empty install.
+            AiStatusProbe after = probe(config);
+            if (!after.modelAvailable()) {
+                throw new OllamaException(
+                        "Pull finished contacting Ollama at " + baseUrl
+                                + ", but model '" + config.model() + "' is still not installed. "
+                                + (after.models().isEmpty()
+                                ? "No models are listed yet — the download may have failed silently, or a different Ollama instance was used."
+                                : "Installed models: " + String.join(", ", after.models()) + ".")
+                                + " Check that Settings → AI Base URL points at the same Ollama that received the pull.");
+            }
             return new PullResult(true, "Pulled model " + config.model() + " via " + baseUrl);
         } catch (OllamaException ex) {
             throw ex;
@@ -212,6 +229,24 @@ public class OllamaClient {
 
     private static String trimTrailingSlash(String url) {
         return OllamaUrlResolver.trimTrailingSlash(url);
+    }
+
+    /** True when an installed tag satisfies the configured model name. */
+    static boolean modelMatches(String configured, String installed) {
+        if (configured == null || installed == null) {
+            return false;
+        }
+        String want = configured.trim();
+        String have = installed.trim();
+        if (want.isEmpty() || have.isEmpty()) {
+            return false;
+        }
+        if (have.equals(want) || have.startsWith(want + ":") || want.startsWith(have + ":")) {
+            return true;
+        }
+        String wantBase = want.contains(":") ? want.substring(0, want.indexOf(':')) : want;
+        String haveBase = have.contains(":") ? have.substring(0, have.indexOf(':')) : have;
+        return wantBase.equals(haveBase);
     }
 
     private static String friendlyUnreachable(Exception ex) {
