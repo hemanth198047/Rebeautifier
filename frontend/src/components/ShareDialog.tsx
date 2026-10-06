@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError, type BookRole, type Member } from '../api'
+import { useDialog } from './DialogProvider'
 
 type Props = {
   bookId: string
@@ -9,6 +10,7 @@ type Props = {
 }
 
 export function ShareDialog({ bookId, open, onClose, onChanged }: Props) {
+  const { confirm } = useDialog()
   const [members, setMembers] = useState<Member[]>([])
   const [usernameOrEmail, setUsernameOrEmail] = useState('')
   const [role, setRole] = useState<'EDITOR' | 'VIEWER'>('EDITOR')
@@ -67,7 +69,14 @@ export function ShareDialog({ bookId, open, onClose, onChanged }: Props) {
   }
 
   async function remove(userId: string) {
-    if (!confirm('Remove this collaborator?')) return
+    const ok = await confirm({
+      title: 'Remove collaborator',
+      message: 'Remove this collaborator from the book?',
+      confirmLabel: 'Remove',
+      cancelLabel: 'Cancel',
+      danger: true,
+    })
+    if (!ok) return
     setBusy(true)
     try {
       await api(`/api/v1/books/${bookId}/members/${userId}`, { method: 'DELETE' })
@@ -81,7 +90,14 @@ export function ShareDialog({ bookId, open, onClose, onChanged }: Props) {
 
   async function transfer(event: FormEvent) {
     event.preventDefault()
-    if (!confirm(`Transfer ownership to ${transferTo}? You will become an Editor.`)) return
+    const ok = await confirm({
+      title: 'Transfer ownership',
+      message: `Transfer ownership to ${transferTo}? You will become an Editor.`,
+      confirmLabel: 'Transfer ownership',
+      cancelLabel: 'Cancel',
+      danger: true,
+    })
+    if (!ok) return
     setBusy(true)
     try {
       await api(`/api/v1/books/${bookId}/transfer`, {

@@ -1,7 +1,8 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
 import { AuthProvider } from './auth'
+import { DialogProvider } from './components/DialogProvider'
 import { ProtectedRoute } from './ProtectedRoute'
 import { BookPage } from './pages/BookPage'
 import { ChapterPage } from './pages/ChapterPage'
@@ -13,7 +14,6 @@ import { SectionPage } from './pages/SectionPage'
 import { SearchPage } from './pages/SearchPage'
 import { BackupPage } from './pages/BackupPage'
 import { SettingsPage } from './pages/SettingsPage'
-import { Navigate } from 'react-router-dom'
 import './index.css'
 
 const router = createBrowserRouter([
@@ -42,7 +42,9 @@ const router = createBrowserRouter([
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>
-      <RouterProvider router={router} />
+      <DialogProvider>
+        <RouterProvider router={router} />
+      </DialogProvider>
     </AuthProvider>
   </StrictMode>,
 )

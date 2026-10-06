@@ -13,13 +13,17 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Picks a reachable Ollama base URL from common Compose / Docker Desktop / localhost candidates.
+ * Successful lookups are cached briefly so refine/status calls skip repeated multi-host probes.
  */
 public final class OllamaUrlResolver {
 
     private static final Logger log = LoggerFactory.getLogger(OllamaUrlResolver.class);
+    private static final long CACHE_TTL_MS = 90_000L;
+    private static final ConcurrentHashMap<String, CacheEntry> CACHE = new ConcurrentHashMap<>();
 
     private OllamaUrlResolver() {
     }
@@ -44,23 +48,46 @@ public final class OllamaUrlResolver {
     }
 
     public static String findReachable(HttpClient httpClient, String preferred) {
+        String cacheKey = cacheKey(preferred);
+        CacheEntry cached = CACHE.get(cacheKey);
+        long now = System.currentTimeMillis();
+        if (cached != null && now - cached.atMs < CACHE_TTL_MS) {
+            return cached.url;
+        }
+
         for (String candidate : candidates(preferred)) {
-            if (isReachable(httpClient, candidate)) {
+            if (isReachable(httpClient, candidate, Duration.ofMillis(700))) {
                 if (preferred != null && !preferred.isBlank()
                         && !trimTrailingSlash(preferred).equals(candidate)) {
                     log.info("Ollama preferred URL {} unreachable; using {}", preferred, candidate);
                 }
+                CACHE.put(cacheKey, new CacheEntry(candidate, now));
                 return candidate;
             }
         }
-        return trimTrailingSlash(preferred);
+        String fallback = trimTrailingSlash(preferred);
+        CACHE.remove(cacheKey);
+        return fallback;
+    }
+
+    public static void invalidate(String preferred) {
+        CACHE.remove(cacheKey(preferred));
+    }
+
+    /** Test helper — clears all cached URLs. */
+    public static void clearCache() {
+        CACHE.clear();
     }
 
     public static boolean isReachable(HttpClient httpClient, String baseUrl) {
+        return isReachable(httpClient, baseUrl, Duration.ofMillis(700));
+    }
+
+    public static boolean isReachable(HttpClient httpClient, String baseUrl, Duration timeout) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(trimTrailingSlash(baseUrl) + "/api/tags"))
-                    .timeout(Duration.ofSeconds(2))
+                    .timeout(timeout)
                     .GET()
                     .build();
             HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
@@ -89,5 +116,12 @@ public final class OllamaUrlResolver {
         return name.contains("unresolved") || name.contains("unknownhost")
                 || msg.contains("unresolved") || msg.contains("unknown host")
                 || msg.contains("nodename nor servname");
+    }
+
+    private static String cacheKey(String preferred) {
+        return preferred == null || preferred.isBlank() ? "" : trimTrailingSlash(preferred);
+    }
+
+    private record CacheEntry(String url, long atMs) {
     }
 }

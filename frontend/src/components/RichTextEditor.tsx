@@ -4,6 +4,7 @@ import Placeholder from '@tiptap/extension-placeholder'
 import Underline from '@tiptap/extension-underline'
 import Link from '@tiptap/extension-link'
 import { useEffect } from 'react'
+import { useDialog } from './DialogProvider'
 
 type Props = {
   value: string
@@ -18,6 +19,7 @@ export function RichTextEditor({
   editable = true,
   placeholder = 'Start writing…',
 }: Props) {
+  const { prompt } = useDialog()
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -113,14 +115,22 @@ export function RichTextEditor({
             label="Link"
             active={editor.isActive('link')}
             onClick={() => {
-              const prev = editor.getAttributes('link').href as string | undefined
-              const url = window.prompt('Link URL', prev ?? 'https://')
-              if (url === null) return
-              if (url.trim() === '') {
-                editor.chain().focus().unsetLink().run()
-                return
-              }
-              editor.chain().focus().extendMarkRange('link').setLink({ href: url.trim() }).run()
+              void (async () => {
+                const prev = editor.getAttributes('link').href as string | undefined
+                const url = await prompt({
+                  title: 'Add link',
+                  message: 'Enter the URL for the selected text.',
+                  defaultValue: prev ?? 'https://',
+                  placeholder: 'https://',
+                  confirmLabel: 'Apply link',
+                })
+                if (url === null) return
+                if (url.trim() === '') {
+                  editor.chain().focus().unsetLink().run()
+                  return
+                }
+                editor.chain().focus().extendMarkRange('link').setLink({ href: url.trim() }).run()
+              })()
             }}
           />
           <ToolbarButton label="Clear" onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} />

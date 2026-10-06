@@ -10,6 +10,7 @@ import {
   type NoteStatus,
 } from '../api'
 import { useAuth } from '../auth'
+import { useDialog } from '../components/DialogProvider'
 import { RichTextEditor } from '../components/RichTextEditor'
 import { RefinePanel } from '../components/RefinePanel'
 import { AiStatusChip } from '../components/AiStatusChip'
@@ -20,6 +21,7 @@ export function NotePage() {
   const { bookId = '', noteId = '' } = useParams()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
+  const { confirm } = useDialog()
 
   const [book, setBook] = useState<Book | null>(null)
   const [note, setNote] = useState<Note | null>(null)
@@ -165,10 +167,18 @@ export function NotePage() {
   const blocker = useBlocker(dirtyRef.current || saveState === 'saving' || saveState === 'dirty')
   useEffect(() => {
     if (blocker.state !== 'blocked') return
-    const leave = window.confirm('You have unsaved changes. Leave without saving?')
-    if (leave) blocker.proceed()
-    else blocker.reset()
-  }, [blocker])
+    void (async () => {
+      const leave = await confirm({
+        title: 'Unsaved changes',
+        message: 'You have unsaved changes. Leave this note without saving?',
+        confirmLabel: 'Leave',
+        cancelLabel: 'Stay',
+        danger: true,
+      })
+      if (leave) blocker.proceed()
+      else blocker.reset()
+    })()
+  }, [blocker, confirm])
 
   async function onManualSave(event?: FormEvent) {
     event?.preventDefault()
@@ -178,7 +188,14 @@ export function NotePage() {
 
   async function deleteNote() {
     if (!canEdit || !note) return
-    if (!confirm('Delete this note? Original and working content will be removed.')) return
+    const ok = await confirm({
+      title: 'Delete note',
+      message: 'Delete this note? Original and working content will be removed.',
+      confirmLabel: 'Delete note',
+      cancelLabel: 'Cancel',
+      danger: true,
+    })
+    if (!ok) return
     try {
       await api(`/api/v1/notes/${noteId}`, { method: 'DELETE' })
       dirtyRef.current = false
