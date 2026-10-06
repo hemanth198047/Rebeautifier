@@ -6,6 +6,7 @@ import com.rebeautifier.domain.FreeImageSource;
 import com.rebeautifier.web.dto.FreeCoverImageHit;
 import com.rebeautifier.web.dto.FreeCoverImageSearchResponse;
 import com.rebeautifier.web.error.ApiException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -61,20 +62,18 @@ public class FreeCoverImageService {
     private final String picsumBaseUrl;
     private final String wikimediaApiUrl;
 
+    @Autowired
     public FreeCoverImageService(
             ObjectMapper objectMapper,
             @Value("${rebeautifier.free-covers.openverse-base-url:https://api.openverse.org}") String openverseBaseUrl,
             @Value("${rebeautifier.free-covers.picsum-base-url:https://picsum.photos}") String picsumBaseUrl,
             @Value("${rebeautifier.free-covers.wikimedia-api-url:https://commons.wikimedia.org/w/api.php}") String wikimediaApiUrl
     ) {
-        this.objectMapper = objectMapper;
-        this.openverseBaseUrl = trimSlash(openverseBaseUrl);
-        this.picsumBaseUrl = trimSlash(picsumBaseUrl);
-        this.wikimediaApiUrl = wikimediaApiUrl;
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(8))
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .build();
+        this(objectMapper, HttpClient.newBuilder()
+                        .connectTimeout(Duration.ofSeconds(8))
+                        .followRedirects(HttpClient.Redirect.NORMAL)
+                        .build(),
+                openverseBaseUrl, picsumBaseUrl, wikimediaApiUrl);
     }
 
     /** Test seam. */
@@ -215,7 +214,8 @@ public class FreeCoverImageService {
                 + "?action=query&format=json&origin=*"
                 + "&generator=search&gsrnamespace=6&gsrsearch=" + encode(q)
                 + "&gsrlimit=" + pageSize + "&gsroffset=" + offset
-                + "&prop=imageinfo&iiprop=url|mime|size|extmetadata|user&iiurlwidth=400");
+                + "&prop=imageinfo&iiprop=" + encode("url|mime|size|extmetadata|user")
+                + "&iiurlwidth=400");
         JsonNode root = getJson(uri);
         List<FreeCoverImageHit> hits = new ArrayList<>();
         JsonNode pages = root.path("query").path("pages");
@@ -267,7 +267,7 @@ public class FreeCoverImageService {
     private String fetchWikimediaUrl(String pageId) {
         URI uri = URI.create(wikimediaApiUrl
                 + "?action=query&format=json&origin=*&pageids=" + encode(sanitizeId(pageId))
-                + "&prop=imageinfo&iiprop=url|mime&iiurlwidth=900");
+                + "&prop=imageinfo&iiprop=" + encode("url|mime") + "&iiurlwidth=900");
         JsonNode root = getJson(uri);
         JsonNode pages = root.path("query").path("pages");
         if (!pages.isObject() || pages.isEmpty()) {
