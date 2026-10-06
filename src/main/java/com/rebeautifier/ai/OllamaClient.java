@@ -182,16 +182,17 @@ public class OllamaClient {
                 String responseBody = response.body() == null ? "" : response.body();
                 String registryErr = extractRegistryError(responseBody);
                 if (registryErr != null) {
-                    throw new OllamaException(registryFailureMessage(baseUrl, registryErr));
+                    throw new OllamaException(classifyPullFailure(config.model(), baseUrl, registryErr));
                 }
                 throw new OllamaException("Ollama pull failed with HTTP " + response.statusCode()
                         + (responseBody.isBlank() ? "" : ": " + truncate(responseBody, 200)));
             }
-            // Ollama may return 200 with an error payload when registry DNS/network fails.
+            // Ollama may return 200 with an error payload when registry DNS/network fails
+            // or when the model name is not in the library.
             if (response.body() != null && response.body().toLowerCase().contains("error")) {
                 String registryErr = extractRegistryError(response.body());
                 if (registryErr != null) {
-                    throw new OllamaException(registryFailureMessage(baseUrl, registryErr));
+                    throw new OllamaException(classifyPullFailure(config.model(), baseUrl, registryErr));
                 }
             }
             return new PullResult(true, "Pulled model " + config.model() + " via " + baseUrl);
@@ -264,7 +265,15 @@ public class OllamaClient {
         return null;
     }
 
-    private static String registryFailureMessage(String baseUrl, String registryErr) {
+    private static String classifyPullFailure(String model, String baseUrl, String registryErr) {
+        if (OllamaModelNames.looksLikeMissingLibraryModel(registryErr)
+                || OllamaModelNames.looksLikeCloudApiModel(model)) {
+            return OllamaModelNames.missingLibraryModelHint(model);
+        }
+        return registryConnectivityMessage(baseUrl, registryErr);
+    }
+
+    private static String registryConnectivityMessage(String baseUrl, String registryErr) {
         return "Ollama is reachable at " + baseUrl
                 + " but could not download from the model registry (registry.ollama.ai). "
                 + "Detail: " + truncate(registryErr, 200)

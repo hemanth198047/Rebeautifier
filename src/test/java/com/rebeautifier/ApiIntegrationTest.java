@@ -337,6 +337,34 @@ class ApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.enabled").value(true));
 
+        mockMvc.perform(put("/api/v1/settings/ai")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"enabled":true,"provider":"OLLAMA","model":"gpt-4o-mini","baseUrl":null,"apiKey":null,"clearApiKey":false,"pullModelOnSave":false}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.model").value("gpt-4o-mini"));
+
+        mockMvc.perform(post("/api/v1/settings/ai/pull-model")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AI_MODEL_MISMATCH"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("API key")));
+
+        mockMvc.perform(put("/api/v1/settings/ai")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"enabled":true,"provider":"OLLAMA","model":"llama3.2:1b","baseUrl":null,"apiKey":null,"clearApiKey":false,"pullModelOnSave":false}
+                                """))
+                .andExpect(status().isOk());
+
         mockMvc.perform(get("/api/v1/system/ai-status").session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.available").value(true))
