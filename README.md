@@ -2,6 +2,8 @@
 
 A calm, installable reading library for organizing thoughts as **Book → Chapter → Section → Notes**. Multi-user accounts with Owner / Editor / Viewer membership. Rich-text notes work without AI. Optional local AI refine via **Ollama** (backend-only).
 
+**Version:** 0.1.0 · Full setup: [`SETUP.md`](./SETUP.md) · Acceptance: [`ACCEPTANCE.md`](./ACCEPTANCE.md)
+
 ## Stack
 
 - Java 17+, Spring Boot 3.4, Maven
@@ -29,6 +31,8 @@ Demo login (seeded on first boot):
 
 Second demo user: `editor` / `password123` (editor on *Morning Pages*).
 
+Optional env file: copy [`.env.example`](./.env.example) to `.env`.
+
 ### Optional AI (Ollama)
 
 ```bash
@@ -39,7 +43,7 @@ docker compose --profile ai exec ollama ollama pull llama3.2:1b
 
 Default model: `llama3.2:1b` (4 GB RAM friendly). Override with `OLLAMA_MODEL` / `OLLAMA_BASE_URL`.
 
-Without the AI profile, notes still work; the UI shows **AI offline**.
+Without the AI profile, notes still work; the UI shows **AI offline** (see **Settings**).
 
 Stop:
 
@@ -49,11 +53,22 @@ docker compose down
 
 Data persists in Docker volumes (`pgdata`, `covers`, `ollama`).
 
+Health probes for orchestration:
+
+- Liveness: `GET /api/v1/health`
+- Readiness: `GET /api/v1/health/ready` (HTTP 503 if database is down)
+
+Quick smoke (API must be up):
+
+```bash
+./scripts/smoke-check.sh
+```
+
 ## Local development (non-Docker)
 
-### 1. PostgreSQL
+See [`SETUP.md`](./SETUP.md) for the full path. Short version:
 
-Create a database and user (example):
+### 1. PostgreSQL
 
 ```bash
 sudo -u postgres psql -c "CREATE USER rebeautifier WITH PASSWORD 'rebeautifier';"
@@ -111,7 +126,12 @@ cd Rebeautifier
 docker compose up --build
 ```
 
-Then visit http://localhost:8080 → sign in as `reader` / `password123` → open **Morning Pages** → open a note → edit/save → use **Refine with AI** (shows offline if Ollama is absent) → restart Compose and confirm notes remain.
+Then visit http://localhost:8080 → sign in as `reader` / `password123` → open **Morning Pages** → open a note → edit/save → use **Refine with AI** (shows offline if Ollama is absent) → open **Settings** for install/AI status → restart Compose and confirm notes remain.
+
+## Backup
+
+- In-app: **Backup** page — Markdown or versioned JSON per book; JSON import creates a new owned book.
+- Host-level: `pg_dump` + covers volume — see [`SETUP.md`](./SETUP.md#backup-and-recovery).
 
 ## API overview (`/api/v1`)
 
@@ -137,8 +157,13 @@ src/main/resources/db/migration/  # Flyway
 frontend/                         # React + Vite SPA
 Dockerfile
 docker-compose.yml
+docker-compose.host-gateway.yml   # optional nested-Docker override
+SETUP.md
+ACCEPTANCE.md
+scripts/smoke-check.sh
+.env.example
 ```
 
 ## Phase status
 
-Phase 5 (search, export, and recovery) — ACL-scoped search; Markdown + JSON export; validated JSON restore.
+Phase 6 (quality and release readiness) — Compose packaging polish, health/ready probes, Settings, setup + acceptance docs.

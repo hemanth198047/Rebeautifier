@@ -18,13 +18,19 @@ RUN chmod +x mvnw && ./mvnw -DskipTests package
 
 FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
-RUN mkdir -p /app/data/covers
-COPY --from=api-build /app/target/rebeautifier-0.0.1-SNAPSHOT.jar /app/app.jar
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /app/data/covers
+COPY --from=api-build /app/target/rebeautifier.jar /app/app.jar
 COPY docker/api-entrypoint.sh /app/api-entrypoint.sh
 RUN chmod +x /app/api-entrypoint.sh
 ENV SERVER_PORT=8080 \
     COVER_STORAGE_PATH=/app/data/covers \
-    SEED_DEMO_DATA=true
+    SEED_DEMO_DATA=true \
+    APP_VERSION=0.1.0
 EXPOSE 8080
 VOLUME ["/app/data"]
+HEALTHCHECK --interval=10s --timeout=5s --start-period=50s --retries=12 \
+  CMD curl -fsS http://127.0.0.1:8080/api/v1/health/ready || exit 1
 ENTRYPOINT ["/app/api-entrypoint.sh"]

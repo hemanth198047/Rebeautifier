@@ -1,0 +1,20 @@
+# Optional override for environments where container-to-container DNS/TCP is
+# broken (some cloud agent / nested Docker bridges). Usage:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.host-gateway.yml up --build
+#
+# Requires published host ports for db (and ollama when using --profile ai).
+services:
+  api:
+    extra_hosts:
+      - "db:host-gateway"
+      - "ollama:host-gateway"
+    environment:
+      http_proxy: ""
+      https_proxy: ""
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      ALL_PROXY: ""
+      all_proxy: ""
+      no_proxy: "*"
+      NO_PROXY: "*"

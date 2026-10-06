@@ -1,0 +1,15 @@
+# Activate with SPRING_PROFILES_ACTIVE=prod for non-demo installs.
+rebeautifier:
+  seed-demo-data: ${SEED_DEMO_DATA:false}
+
+spring:
+  session:
+    cookie:
+      # Set SESSION_COOKIE_SECURE=true when serving over HTTPS.
+      secure: ${SESSION_COOKIE_SECURE:false}
+
+logging:
+  level:
+    root: INFO
+    com.rebeautifier: INFO
+    org.springframework.security: WARN

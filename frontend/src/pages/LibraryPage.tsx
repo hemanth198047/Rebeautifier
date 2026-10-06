@@ -57,6 +57,9 @@ export function LibraryPage() {
           <Link className="btn btn-ghost" to="/backup">
             Backup
           </Link>
+          <Link className="btn btn-ghost" to="/settings">
+            Settings
+          </Link>
           <AiStatusChip />
           <span className="muted">{user?.displayName}</span>
           <button className="btn btn-ghost" type="button" onClick={() => void logout()}>
