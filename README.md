@@ -18,6 +18,35 @@ A calm, installable reading library for organizing thoughts as **Book → Chapte
 
 Requirements: Docker and Docker Compose.
 
+**Linux / macOS**
+
+```bash
+./start.sh                 # builds and starts db + api (SPA on :8080)
+./start.sh --ai --pull-model   # optional local Ollama
+./stop.sh                  # stop (keeps volumes)
+./stop.sh --purge          # stop and delete volumes
+```
+
+**Windows**
+
+```bat
+start.bat
+start.bat --ai --pull-model
+stop.bat
+stop.bat --purge
+```
+
+PowerShell alternatives: `.\start.ps1`, `.\stop.ps1` (flags: `-Ai`, `-PullModel`, `-HostGateway`, `-Purge`).
+
+Nested Docker / broken bridge networking:
+
+```bash
+./start.sh --host-gateway
+# Windows: start.bat --host-gateway
+```
+
+Or raw Compose:
+
 ```bash
 docker compose up --build
 ```
@@ -31,13 +60,14 @@ Demo login (seeded on first boot):
 
 Second demo user: `editor` / `password123` (editor on *Morning Pages*).
 
-Optional env file: copy [`.env.example`](./.env.example) to `.env`.
+Optional env file: copy [`.env.example`](./.env.example) to `.env` (created automatically by `start.sh` / `start.bat` if missing).
 
 ### Optional AI (Ollama)
 
 ```bash
+./start.sh --ai --pull-model
+# or:
 docker compose --profile ai up --build
-# then pull a small model into the ollama service, e.g.:
 docker compose --profile ai exec ollama ollama pull llama3.2:1b
 ```
 
@@ -48,7 +78,8 @@ Without the AI profile, notes still work; the UI shows **AI offline** (see **Set
 Stop:
 
 ```bash
-docker compose down
+./stop.sh
+# or: docker compose down
 ```
 
 Data persists in Docker volumes (`pgdata`, `covers`, `ollama`).
