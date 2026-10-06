@@ -35,6 +35,9 @@ build/
 frontend/node_modules/
 frontend/dist/
 
+### Locally copied SPA into jar resources (Compose/Dockerfile builds this) ###
+src/main/resources/static/
+
 ### App data ###
 data/
 *.log

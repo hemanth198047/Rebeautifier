@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { api, ApiError, type Book, type Chapter, type Section } from '../api'
+import { api, ApiError, type Book, type Chapter, type Note, type Section } from '../api'
 import { useAuth } from '../auth'
+import { NotesPanel } from '../components/NotesPanel'
 
 export function ChapterPage() {
   const { bookId = '', chapterId = '' } = useParams()
@@ -9,20 +10,24 @@ export function ChapterPage() {
   const [book, setBook] = useState<Book | null>(null)
   const [chapter, setChapter] = useState<Chapter | null>(null)
   const [sections, setSections] = useState<Section[]>([])
+  const [notes, setNotes] = useState<Note[]>([])
   const [title, setTitle] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [dragSectionId, setDragSectionId] = useState<string | null>(null)
   const canEdit = book?.myRole === 'OWNER' || book?.myRole === 'EDITOR'
 
   async function load() {
     try {
-      const [bookData, chapters, sectionData] = await Promise.all([
+      const [bookData, chapters, sectionData, noteData] = await Promise.all([
         api<Book>(`/api/v1/books/${bookId}`),
         api<Chapter[]>(`/api/v1/books/${bookId}/chapters`),
         api<Section[]>(`/api/v1/chapters/${chapterId}/sections`),
+        api<Note[]>(`/api/v1/books/${bookId}/notes?chapterId=${chapterId}`),
       ])
       setBook(bookData)
       setChapter(chapters.find((c) => c.id === chapterId) ?? null)
       setSections(sectionData)
+      setNotes(noteData)
       setError(null)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load chapter')
@@ -47,20 +52,39 @@ export function ChapterPage() {
     }
   }
 
-  async function moveSection(index: number, direction: -1 | 1) {
-    const target = index + direction
-    if (target < 0 || target >= sections.length) return
-    const ordered = sections.map((s) => s.id)
-    ;[ordered[index], ordered[target]] = [ordered[target], ordered[index]]
+  async function reorderSections(orderedIds: string[]) {
     try {
       const updated = await api<Section[]>(`/api/v1/chapters/${chapterId}/sections/reorder`, {
         method: 'PUT',
-        body: JSON.stringify({ orderedIds: ordered }),
+        body: JSON.stringify({ orderedIds }),
       })
       setSections(updated)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Reorder failed')
     }
+  }
+
+  async function moveSection(index: number, direction: -1 | 1) {
+    const target = index + direction
+    if (target < 0 || target >= sections.length) return
+    const ordered = sections.map((s) => s.id)
+    ;[ordered[index], ordered[target]] = [ordered[target], ordered[index]]
+    await reorderSections(ordered)
+  }
+
+  async function onDropSection(targetId: string) {
+    if (!canEdit || !dragSectionId || dragSectionId === targetId) {
+      setDragSectionId(null)
+      return
+    }
+    const ordered = sections.map((s) => s.id)
+    const from = ordered.indexOf(dragSectionId)
+    const to = ordered.indexOf(targetId)
+    setDragSectionId(null)
+    if (from < 0 || to < 0) return
+    ordered.splice(from, 1)
+    ordered.splice(to, 0, dragSectionId)
+    await reorderSections(ordered)
   }
 
   return (
@@ -90,22 +114,32 @@ export function ChapterPage() {
 
         <section className="detail-panel">
           <h1>{chapter?.title ?? 'Chapter'}</h1>
-          <p className="muted">Sections nest beneath this chapter. Notes arrive in Phase 2.</p>
+          <p className="muted">Sections nest beneath this chapter. Capture chapter-level notes below.</p>
         </section>
 
         <section className="detail-panel">
-          <h2>Sections</h2>
+          <div className="panel-heading">
+            <h2>Sections</h2>
+            {canEdit && <p className="muted panel-sub">Drag to reorder, or use the arrows.</p>}
+          </div>
           {sections.length === 0 ? (
             <div className="empty-state">No sections yet.</div>
           ) : (
             <ul className="list">
               {sections.map((section, index) => (
-                <li key={section.id} className="list-item">
+                <li
+                  key={section.id}
+                  className={`list-item ${dragSectionId === section.id ? 'is-dragging' : ''}`}
+                  draggable={canEdit}
+                  onDragStart={() => setDragSectionId(section.id)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => void onDropSection(section.id)}
+                >
                   <Link to={`/books/${bookId}/chapters/${chapterId}/sections/${section.id}`}>
                     <strong>{section.title}</strong>
                   </Link>
                   {canEdit && (
-                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <div className="reorder-controls">
                       <button className="btn btn-ghost" type="button" onClick={() => void moveSection(index, -1)}>
                         ↑
                       </button>
@@ -133,6 +167,15 @@ export function ChapterPage() {
             </form>
           )}
         </section>
+
+        <NotesPanel
+          bookId={bookId}
+          attachType="CHAPTER"
+          chapterId={chapterId}
+          canEdit={!!canEdit}
+          notes={notes}
+          onChanged={load}
+        />
       </main>
     </div>
   )

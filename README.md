@@ -1,6 +1,6 @@
 # Rebeautifier
 
-A calm, installable reading library for organizing thoughts as **Book → Chapter → Section** (notes in Phase 2). Multi-user accounts with Owner / Editor / Viewer membership. Optional local AI via Ollama arrives in later phases.
+A calm, installable reading library for organizing thoughts as **Book → Chapter → Section → Notes**. Multi-user accounts with Owner / Editor / Viewer membership. Rich-text notes work without AI. Optional local AI via Ollama arrives in later phases.
 
 ## Stack
 
@@ -87,7 +87,7 @@ cd Rebeautifier
 docker compose up --build
 ```
 
-Then visit http://localhost:8080 → sign in as `reader` / `password123` → open **Morning Pages** → browse chapters and sections → create a book → restart Compose and confirm it remains.
+Then visit http://localhost:8080 → sign in as `reader` / `password123` → open **Morning Pages** → browse chapters, sections, and seeded notes → open a note, edit with the rich-text editor, Save → create a draft note → restart Compose and confirm notes remain.
 
 ## API overview (`/api/v1`)
 
@@ -97,6 +97,7 @@ Then visit http://localhost:8080 → sign in as `reader` / `password123` → ope
 | Books | CRUD + `PUT/DELETE .../cover` + members |
 | Chapters | list/create/reorder under book; patch/delete by id |
 | Sections | list/create/reorder under chapter; patch/delete by id |
+| Notes | list/create under book; get/patch/delete by id; reorder; draft/saved + content_version |
 | Health | `GET /health`, `GET /health/ready` |
 
 Auth uses an HTTP-only session cookie (`REBEAUTIFIER_SESSION`) plus CSRF (`XSRF-TOKEN` cookie / `X-XSRF-TOKEN` header) for mutating requests.
@@ -113,4 +114,4 @@ docker-compose.yml
 
 ## Phase status
 
-Phase 1 (foundation + reading library) — see project progress docs in the Cursor Project store. Phase 2 will add the rich-text note editor workflow.
+Phase 2 (notes without AI) — TipTap rich-text editor, draft/saved notes, autosave, ACL, sample seed notes. See project progress docs in the Cursor Project store.

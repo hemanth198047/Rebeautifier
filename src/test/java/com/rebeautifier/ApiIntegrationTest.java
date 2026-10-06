@@ -174,6 +174,140 @@ class ApiIntegrationTest {
 
     @Test
     @Order(5)
+    void createUpdateAndVersionNotes() throws Exception {
+        // Recreate a section after order-4 delete so section notes still have a parent.
+        MvcResult sectionResult = mockMvc.perform(post("/api/v1/chapters/" + chapterId + "/sections")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"Notes Section"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+        sectionId = UUID.fromString(objectMapper.readTree(sectionResult.getResponse().getContentAsString()).get("id").asText());
+
+        MvcResult bookNote = mockMvc.perform(post("/api/v1/books/" + bookId + "/notes")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "attachType":"BOOK",
+                                  "title":"Book thought",
+                                  "bodyRich":"<p>Original capture</p>",
+                                  "status":"SAVED",
+                                  "tags":["seed","book"],
+                                  "pageStart":2,
+                                  "pageEnd":4
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.title").value("Book thought"))
+                .andExpect(jsonPath("$.status").value("SAVED"))
+                .andExpect(jsonPath("$.bodyOriginal").value("<p>Original capture</p>"))
+                .andExpect(jsonPath("$.contentVersion").value(1))
+                .andExpect(jsonPath("$.tags[0]").value("seed"))
+                .andReturn();
+        UUID bookNoteId = UUID.fromString(objectMapper.readTree(bookNote.getResponse().getContentAsString()).get("id").asText());
+
+        mockMvc.perform(post("/api/v1/books/" + bookId + "/notes")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "attachType":"SECTION",
+                                  "chapterId":"%s",
+                                  "sectionId":"%s",
+                                  "title":"Section draft",
+                                  "bodyRich":"<p>Still forming</p>",
+                                  "status":"DRAFT",
+                                  "tags":["draft"]
+                                }
+                                """.formatted(chapterId, sectionId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.attachType").value("SECTION"))
+                .andExpect(jsonPath("$.status").value("DRAFT"))
+                .andExpect(jsonPath("$.bodyOriginal").value(org.hamcrest.Matchers.nullValue()));
+
+        mockMvc.perform(patch("/api/v1/notes/" + bookNoteId)
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "expectedContentVersion":1,
+                                  "bodyRich":"<p>Working edit</p>",
+                                  "status":"SAVED",
+                                  "tags":["seed","edited"]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bodyRich").value("<p>Working edit</p>"))
+                .andExpect(jsonPath("$.bodyOriginal").value("<p>Original capture</p>"))
+                .andExpect(jsonPath("$.contentVersion").value(2));
+
+        mockMvc.perform(patch("/api/v1/notes/" + bookNoteId)
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "expectedContentVersion":1,
+                                  "bodyRich":"<p>Stale write</p>"
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("VERSION_CONFLICT"));
+
+        mockMvc.perform(get("/api/v1/books/" + bookId + "/notes").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    @Order(6)
+    void viewerCannotMutateNotes() throws Exception {
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        MvcResult viewerRegister = mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username":"viewer_%s",
+                                  "email":"viewer_%s@example.com",
+                                  "password":"password123",
+                                  "displayName":"Viewer"
+                                }
+                                """.formatted(suffix, suffix)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        MockHttpSession viewerSession = (MockHttpSession) viewerRegister.getRequest().getSession(false);
+
+        mockMvc.perform(post("/api/v1/books/" + bookId + "/members")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"usernameOrEmail":"viewer_%s","role":"VIEWER"}
+                                """.formatted(suffix)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/v1/books/" + bookId + "/notes").session(viewerSession))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/books/" + bookId + "/notes")
+                        .session(viewerSession)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"attachType":"BOOK","title":"Nope","bodyRich":"<p>x</p>","status":"DRAFT"}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @Order(7)
     void logoutClearsSession() throws Exception {
         mockMvc.perform(post("/api/v1/auth/logout").session(session).with(csrf()))
                 .andExpect(status().isNoContent());
