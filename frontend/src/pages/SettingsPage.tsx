@@ -296,21 +296,19 @@ export function SettingsPage() {
                 <h3>Setup steps</h3>
                 <ol>
                   <li>
-                    Install Ollama from{' '}
-                    <a href="https://ollama.com" target="_blank" rel="noreferrer">
-                      ollama.com
-                    </a>
-                    .
+                    Start with AI: <code>./start.sh --ai --pull-model</code> (Windows:{' '}
+                    <code>start.bat --ai --pull-model</code>)
                   </li>
                   <li>
-                    Start with AI: <code>docker compose --profile ai up --build</code>
-                  </li>
-                  <li>
-                    Pull the default model:{' '}
+                    Or manually: <code>docker compose --profile ai up --build</code>, then{' '}
                     <code>docker compose --profile ai exec ollama ollama pull llama3.2:1b</code>
                   </li>
                   <li>
-                    Or set <code>OLLAMA_BASE_URL</code> / <code>OLLAMA_MODEL</code> in <code>.env</code>.
+                    Or install Ollama from{' '}
+                    <a href="https://ollama.com" target="_blank" rel="noreferrer">
+                      ollama.com
+                    </a>{' '}
+                    and set <code>OLLAMA_BASE_URL</code> / <code>OLLAMA_MODEL</code> in <code>.env</code>.
                   </li>
                 </ol>
                 {ai.setupHint && <p className="muted">{ai.setupHint}</p>}
