@@ -39,6 +39,10 @@ public class AiSettingsService {
         return toResponse(loadOrDefaults(user), null);
     }
 
+    /**
+     * Persists settings only. Model pull is intentionally separate so a failed pull
+     * never rolls back an enable/save (which left users stuck on "AI disabled").
+     */
     @Transactional
     public AiSettingsResponse saveForCurrentUser(UpdateAiSettingsRequest request) {
         User user = authService.requireCurrentUser();
@@ -71,24 +75,23 @@ public class AiSettingsService {
             throw ApiException.badRequest("API key is required when using an OpenAI-compatible provider");
         }
 
-        repository.save(settings);
-
-        String pullMessage = null;
-        if (Boolean.TRUE.equals(request.pullModelOnSave())
-                && settings.isEnabled()
-                && settings.getProvider() == AiProvider.OLLAMA) {
-            pullMessage = pullModel(resolveConfig(settings)).message();
-        }
-
-        return toResponse(settings, pullMessage);
+        repository.saveAndFlush(settings);
+        return toResponse(settings, null);
     }
 
     @Transactional(readOnly = true)
     public AiPullResponse pullModelForCurrentUser() {
         User user = authService.requireCurrentUser();
-        UserAiSettings settings = loadOrDefaults(user);
+        UserAiSettings settings = repository.findById(user.getId())
+                .orElseThrow(() -> new ApiException(
+                        "AI_DISABLED",
+                        "Save AI settings with Enable AI turned on before pulling a model.",
+                        HttpStatus.BAD_REQUEST));
         if (!settings.isEnabled()) {
-            throw new ApiException("AI_DISABLED", "Enable AI in Settings before pulling a model.", HttpStatus.BAD_REQUEST);
+            throw new ApiException(
+                    "AI_DISABLED",
+                    "AI is still disabled. Turn on “Enable AI for my account”, click Save AI settings, then pull again.",
+                    HttpStatus.BAD_REQUEST);
         }
         if (settings.getProvider() != AiProvider.OLLAMA) {
             throw ApiException.badRequest("Model pull is only available for the local Ollama provider");
@@ -118,12 +121,27 @@ public class AiSettingsService {
     }
 
     private AiPullResponse pullModel(AiRuntimeConfig config) {
+        String storageHint = "Ollama stores models inside its data volume (Compose volume `ollama`, or ~/.ollama on a host install).";
         try {
             OllamaClient.PullResult result = ollamaClient.pullModel(config);
             OllamaClient.AiStatusProbe probe = ollamaClient.probe(config);
-            return new AiPullResponse(result.success(), result.message(), probe.modelAvailable());
+            String next = probe.modelAvailable()
+                    ? "Next: open a note and use AI review / Refine. The status chip should show AI online."
+                    : "Pull finished but the model is not listed yet. Wait a few seconds, click Refresh status, or pull again.";
+            return new AiPullResponse(
+                    result.success(),
+                    "Downloaded “" + config.model() + "” from the Ollama registry into local Ollama storage.",
+                    probe.modelAvailable(),
+                    next,
+                    storageHint
+            );
         } catch (OllamaClient.OllamaException ex) {
-            throw new ApiException("AI_PULL_FAILED", ex.getMessage(), HttpStatus.BAD_GATEWAY);
+            throw new ApiException(
+                    "AI_PULL_FAILED",
+                    "Could not download “" + config.model() + "”: " + ex.getMessage()
+                            + " Your AI settings stay enabled — fix Ollama connectivity and click Pull model again. "
+                            + storageHint,
+                    HttpStatus.BAD_GATEWAY);
         }
     }
 

@@ -4,6 +4,7 @@ import {
   api,
   ApiError,
   type AiProvider,
+  type AiPullResult,
   type AiSettings,
   type AiStatus,
   type RateLimitStatus,
@@ -40,6 +41,7 @@ export function SettingsPage() {
   const [profileBusy, setProfileBusy] = useState(false)
   const [aiBusy, setAiBusy] = useState(false)
   const [pullBusy, setPullBusy] = useState(false)
+  const [pullProgress, setPullProgress] = useState<string | null>(null)
 
   const [aiEnabled, setAiEnabled] = useState(false)
   const [aiProvider, setAiProvider] = useState<AiProvider>('OLLAMA')
@@ -47,7 +49,7 @@ export function SettingsPage() {
   const [aiBaseUrl, setAiBaseUrl] = useState('')
   const [aiApiKey, setAiApiKey] = useState('')
   const [clearApiKey, setClearApiKey] = useState(false)
-  const [pullOnSave, setPullOnSave] = useState(true)
+  const [pullOnSave, setPullOnSave] = useState(false)
 
   useEffect(() => {
     setDisplayName(user?.displayName ?? '')
@@ -61,7 +63,6 @@ export function SettingsPage() {
     setAiBaseUrl(settings.baseUrl ?? '')
     setAiApiKey('')
     setClearApiKey(false)
-    setPullOnSave(settings.provider === 'OLLAMA')
   }
 
   async function refreshStatus() {
@@ -132,6 +133,13 @@ export function SettingsPage() {
     setAiBusy(true)
     setAiMsg(null)
     setError(null)
+    setPullProgress(null)
+    const willPull = aiEnabled && aiProvider === 'OLLAMA' && pullOnSave
+    if (willPull) {
+      setPullProgress(
+        `Saving settings, then downloading “${aiModel}” into Ollama. This can take several minutes — leave this page open.`,
+      )
+    }
     try {
       const saved = await api<AiSettings>('/api/v1/settings/ai', {
         method: 'PUT',
@@ -142,23 +150,28 @@ export function SettingsPage() {
           baseUrl: aiBaseUrl.trim() || null,
           apiKey: aiApiKey.trim() || null,
           clearApiKey,
-          pullModelOnSave: aiEnabled && aiProvider === 'OLLAMA' && pullOnSave,
+          pullModelOnSave: willPull,
         }),
       })
       applyAiSettingsForm(saved)
       const aiStatus = await api<AiStatus>('/api/v1/system/ai-status')
       setAi(aiStatus)
-      setAiMsg(
-        saved.pullMessage
-          ? `Saved. ${saved.pullMessage}`
-          : saved.enabled
-            ? 'AI settings saved — refine will use this configuration.'
-            : 'AI disabled. Notes still work.',
-      )
+      if (saved.pullMessage) {
+        setAiMsg(saved.pullMessage)
+      } else if (saved.enabled) {
+        setAiMsg(
+          aiProvider === 'OLLAMA'
+            ? 'AI enabled and saved. Next: click “Pull model now” to download the model into Ollama, then open a note and use Refine.'
+            : 'AI settings saved — refine will use this API key and model.',
+        )
+      } else {
+        setAiMsg('AI disabled. Notes still work.')
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not save AI settings')
     } finally {
       setAiBusy(false)
+      setPullProgress(null)
     }
   }
 
@@ -166,18 +179,23 @@ export function SettingsPage() {
     setPullBusy(true)
     setAiMsg(null)
     setError(null)
+    setPullProgress(
+      `Downloading “${aiModel}” from the Ollama registry into local Ollama storage (Compose volume “ollama”, or ~/.ollama). This can take several minutes on first pull — keep this page open.`,
+    )
     try {
-      const result = await api<{ success: boolean; message: string; modelAvailable: boolean }>(
-        '/api/v1/settings/ai/pull-model',
-        { method: 'POST', body: '{}' },
-      )
+      const result = await api<AiPullResult>('/api/v1/settings/ai/pull-model', {
+        method: 'POST',
+        body: '{}',
+      })
       const aiStatus = await api<AiStatus>('/api/v1/system/ai-status')
       setAi(aiStatus)
-      setAiMsg(result.message + (result.modelAvailable ? ' Model is ready.' : ''))
+      const parts = [result.message, result.storageHint, result.nextStep].filter(Boolean)
+      setAiMsg(parts.join(' '))
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not pull model')
     } finally {
       setPullBusy(false)
+      setPullProgress(null)
     }
   }
 
@@ -220,6 +238,7 @@ export function SettingsPage() {
         {profileMsg && <div className="success-banner">{profileMsg}</div>}
         {passwordMsg && <div className="success-banner">{passwordMsg}</div>}
         {aiMsg && <div className="success-banner">{aiMsg}</div>}
+        {pullProgress && <div className="info-banner">{pullProgress}</div>}
 
         <div className="settings-grid">
           <article className="settings-panel">
@@ -316,8 +335,8 @@ export function SettingsPage() {
           <article className="settings-panel settings-panel-wide">
             <h2>AI</h2>
             <p className="muted panel-sub">
-              Enable or disable AI here. Choose local Ollama (pull the model from this screen) or paste an API key for
-              any OpenAI-compatible provider. No CLI steps required for day-to-day use.
+              1) Enable AI and Save. 2) For Ollama, click Pull model now and wait for the download. 3) When the status
+              chip says AI online, open a note and use Refine. Notes always work with AI off.
             </p>
             <div className="ai-status-block">
               <AiStatusChip />
@@ -339,7 +358,6 @@ export function SettingsPage() {
                     checked={aiProvider === 'OLLAMA'}
                     onChange={() => {
                       setAiProvider('OLLAMA')
-                      setPullOnSave(true)
                       if (!aiModel) setAiModel('llama3.2:1b')
                     }}
                   />
@@ -352,7 +370,6 @@ export function SettingsPage() {
                     checked={aiProvider === 'OPENAI_COMPATIBLE'}
                     onChange={() => {
                       setAiProvider('OPENAI_COMPATIBLE')
-                      setPullOnSave(false)
                       if (aiModel === 'llama3.2:1b') setAiModel('gpt-4o-mini')
                     }}
                   />
@@ -423,25 +440,41 @@ export function SettingsPage() {
                     onChange={(e) => setPullOnSave(e.target.checked)}
                     disabled={!aiEnabled}
                   />
-                  <span>Pull model when saving (if Ollama is reachable)</span>
+                  <span>Also pull model while saving (can take several minutes)</span>
                 </label>
               )}
 
               <div className="settings-actions">
-                <button className="btn btn-primary" type="submit" disabled={aiBusy}>
-                  {aiBusy ? 'Saving…' : 'Save AI settings'}
+                <button className="btn btn-primary" type="submit" disabled={aiBusy || pullBusy}>
+                  {aiBusy ? (pullOnSave && aiEnabled ? 'Saving & downloading…' : 'Saving…') : 'Save AI settings'}
                 </button>
                 {aiEnabled && aiProvider === 'OLLAMA' && (
                   <button
                     className="btn btn-ghost"
                     type="button"
-                    disabled={pullBusy || aiBusy}
+                    disabled={pullBusy || aiBusy || !aiSettings?.enabled}
+                    title={
+                      !aiSettings?.enabled
+                        ? 'Save AI settings with Enable AI turned on first'
+                        : 'Download the model into Ollama storage'
+                    }
                     onClick={() => void onPullModel()}
                   >
-                    {pullBusy ? 'Pulling model…' : 'Pull model now'}
+                    {pullBusy ? 'Downloading model…' : 'Pull model now'}
                   </button>
                 )}
               </div>
+              {aiEnabled && aiProvider === 'OLLAMA' && !aiSettings?.enabled && (
+                <p className="muted settings-note">
+                  Pull is available after a successful Save with Enable AI checked.
+                </p>
+              )}
+              {ai?.enabled && aiProvider === 'OLLAMA' && !ai.available && (
+                <p className="muted settings-note">
+                  AI is enabled but the model is not ready yet. Use Pull model now, wait for the download to finish,
+                  then Refresh status. Models are stored by Ollama (Compose volume <code>ollama</code>).
+                </p>
+              )}
             </form>
 
             <dl className="settings-dl" style={{ marginTop: '1.25rem' }}>
