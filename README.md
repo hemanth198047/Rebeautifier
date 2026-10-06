@@ -2,7 +2,7 @@
 
 A calm, installable reading library for organizing thoughts as **Book → Chapter → Section → Notes**. Multi-user accounts with Owner / Editor / Viewer membership. Rich-text notes work without AI. Optional local AI refine via **Ollama** (backend-only).
 
-**Version:** 0.5.0 · Full setup: [`SETUP.md`](./SETUP.md) · Acceptance: [`ACCEPTANCE.md`](./ACCEPTANCE.md)
+**Version:** 0.6.0 · Full setup: [`SETUP.md`](./SETUP.md) · Acceptance: [`ACCEPTANCE.md`](./ACCEPTANCE.md)
 
 ## Stack
 
@@ -143,6 +143,7 @@ Then visit http://localhost:8080 → sign in as `reader` / `password123` → ope
 | Sections | list/create/reorder under chapter; patch/delete by id |
 | Notes | list/create under book; get/patch/delete by id; reorder; draft/saved + content_version |
 | AI | `GET /system/ai-status`; note refinements create/list; accept/reject/regenerate |
+| Limits | `GET /system/rate-limits` (auth + AI sliding windows; in-memory per process) |
 | Search | `GET /search?q=` ACL-scoped |
 | Backup | `GET /books/{id}/export?format=json\|markdown`; `POST /books/import`; `PUT /books/{id}/import` (owner replace) |
 | Members | invite / role patch / remove; `POST /books/{id}/transfer` ownership |
@@ -167,4 +168,4 @@ scripts/smoke-check.sh
 
 ## Phase status
 
-Phase 10 (profile & Markdown covers) — display-name edit, data-URI cover embed, structured auth/AI logs.
+Phase 11 (rate-limit transparency) — Settings rate-limit status, Retry-After UX, frontend unit tests.

@@ -28,7 +28,7 @@ RUN chmod +x /app/api-entrypoint.sh
 ENV SERVER_PORT=8080 \
     COVER_STORAGE_PATH=/app/data/covers \
     SEED_DEMO_DATA=true \
-    APP_VERSION=0.5.0
+    APP_VERSION=0.6.0
 EXPOSE 8080
 VOLUME ["/app/data"]
 HEALTHCHECK --interval=10s --timeout=5s --start-period=50s --retries=12 \

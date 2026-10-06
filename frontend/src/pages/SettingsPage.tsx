@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { api, ApiError, type AiStatus, type User } from '../api'
+import { api, ApiError, type AiStatus, type RateLimitStatus, type User } from '../api'
 import { useAuth } from '../auth'
 import { AiStatusChip } from '../components/AiStatusChip'
 
@@ -17,6 +17,7 @@ type Ready = Health & {
 export function SettingsPage() {
   const { user, logout, setUser } = useAuth()
   const [ai, setAi] = useState<AiStatus | null>(null)
+  const [limits, setLimits] = useState<RateLimitStatus | null>(null)
   const [health, setHealth] = useState<Health | null>(null)
   const [ready, setReady] = useState<Ready | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -35,12 +36,14 @@ export function SettingsPage() {
   async function refreshStatus() {
     setError(null)
     try {
-      const [aiStatus, healthStatus, readyStatus] = await Promise.all([
+      const [aiStatus, limitStatus, healthStatus, readyStatus] = await Promise.all([
         api<AiStatus>('/api/v1/system/ai-status'),
+        api<RateLimitStatus>('/api/v1/system/rate-limits'),
         fetch('/api/v1/health').then(async (r) => (await r.json()) as Health),
         fetch('/api/v1/health/ready').then(async (r) => (await r.json()) as Ready),
       ])
       setAi(aiStatus)
+      setLimits(limitStatus)
       setHealth(healthStatus)
       setReady(readyStatus)
     } catch (err) {
@@ -219,6 +222,33 @@ export function SettingsPage() {
             <p className="muted settings-note">
               Orchestrators can probe <code>/api/v1/health</code> and <code>/api/v1/health/ready</code>.
             </p>
+          </article>
+
+          <article className="settings-panel">
+            <h2>Rate limits</h2>
+            <dl className="settings-dl">
+              <div>
+                <dt>Auth / minute</dt>
+                <dd>
+                  {limits
+                    ? `${limits.authUsed} used · ${limits.authRemaining} left of ${limits.authPerMinute}`
+                    : '—'}
+                </dd>
+              </div>
+              <div>
+                <dt>AI refine / minute</dt>
+                <dd>
+                  {limits
+                    ? `${limits.aiUsed} used · ${limits.aiRemaining} left of ${limits.aiPerMinute}`
+                    : '—'}
+                </dd>
+              </div>
+              <div>
+                <dt>Window</dt>
+                <dd>{limits ? `${limits.windowSeconds}s · ${limits.storage}` : '—'}</dd>
+              </div>
+            </dl>
+            <p className="muted settings-note">{limits?.note ?? 'Loading limit status…'}</p>
           </article>
 
           <article className="settings-panel settings-panel-wide">

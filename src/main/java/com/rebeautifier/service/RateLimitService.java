@@ -12,9 +12,12 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Simple sliding-window rate limiter for auth and AI mutation endpoints.
+ * Counters are in-memory per JVM process (not shared across replicas).
  */
 @Service
 public class RateLimitService {
+
+    public static final int WINDOW_SECONDS = 60;
 
     private final int authPerMinute;
     private final int aiPerMinute;
@@ -36,6 +39,41 @@ public class RateLimitService {
     public void checkAi(String clientKey) {
         check("ai:" + sanitize(clientKey), aiPerMinute, Duration.ofMinutes(1),
                 "Too many AI refine requests. Wait a minute and try again.");
+    }
+
+    public int authPerMinute() {
+        return authPerMinute;
+    }
+
+    public int aiPerMinute() {
+        return aiPerMinute;
+    }
+
+    /**
+     * Peek current window usage without consuming a slot.
+     */
+    public Usage peekAuth(String clientKey) {
+        return peek("auth:" + sanitize(clientKey), authPerMinute);
+    }
+
+    public Usage peekAi(String clientKey) {
+        return peek("ai:" + sanitize(clientKey), aiPerMinute);
+    }
+
+    private Usage peek(String key, int max) {
+        long now = System.currentTimeMillis();
+        long cutoff = now - Duration.ofMinutes(1).toMillis();
+        Deque<Long> q = windows.get(key);
+        if (q == null) {
+            return new Usage(0, max);
+        }
+        synchronized (q) {
+            while (!q.isEmpty() && q.peekFirst() < cutoff) {
+                q.removeFirst();
+            }
+            int used = q.size();
+            return new Usage(used, Math.max(0, max - used));
+        }
     }
 
     private void check(String key, int max, Duration window, String message) {
@@ -60,5 +98,8 @@ public class RateLimitService {
             return "unknown";
         }
         return key.length() > 120 ? key.substring(0, 120) : key;
+    }
+
+    public record Usage(int used, int remaining) {
     }
 }

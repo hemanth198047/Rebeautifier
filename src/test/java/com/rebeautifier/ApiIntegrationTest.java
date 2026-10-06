@@ -612,6 +612,16 @@ class ApiIntegrationTest {
                 .andExpect(jsonPath("$.metricsFailed").exists())
                 .andExpect(jsonPath("$.metricsAverageLatencyMs").exists());
 
+        mockMvc.perform(get("/api/v1/system/rate-limits").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.storage").value("in-memory"))
+                .andExpect(jsonPath("$.windowSeconds").value(60))
+                .andExpect(jsonPath("$.authPerMinute").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)))
+                .andExpect(jsonPath("$.aiPerMinute").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)))
+                .andExpect(jsonPath("$.authRemaining").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0)))
+                .andExpect(jsonPath("$.aiRemaining").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0)))
+                .andExpect(jsonPath("$.note").value(org.hamcrest.Matchers.containsString("per API process")));
+
         mockMvc.perform(patch("/api/v1/auth/me")
                         .session(session)
                         .with(csrf())

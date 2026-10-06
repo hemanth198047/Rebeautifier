@@ -38,12 +38,14 @@ Use after a clean install (Compose recommended). Mark each item when verified.
 - [ ] Settings can update display name (`PATCH /api/v1/auth/me`)
 - [ ] Markdown export embeds small covers as data URIs; oversized covers keep a JSON note
 - [ ] Change password works from Settings
+- [ ] Settings shows in-memory auth/AI rate-limit usage (`GET /api/v1/system/rate-limits`)
+- [ ] `RATE_LIMITED` responses include retry guidance in the SPA
 
 ## Automated gates
 
 ```bash
 ./mvnw test
-cd frontend && npm run build
+cd frontend && npm run build && npm test
 ./scripts/smoke-check.sh
 ```
 
