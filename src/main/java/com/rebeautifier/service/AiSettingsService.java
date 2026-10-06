@@ -2,6 +2,7 @@ package com.rebeautifier.service;
 
 import com.rebeautifier.ai.AiRuntimeConfig;
 import com.rebeautifier.ai.OllamaClient;
+import com.rebeautifier.ai.OllamaModelNames;
 import com.rebeautifier.ai.OpenAiCompatibleClient;
 import com.rebeautifier.domain.AiProvider;
 import com.rebeautifier.domain.User;
@@ -96,7 +97,14 @@ public class AiSettingsService {
         if (settings.getProvider() != AiProvider.OLLAMA) {
             throw ApiException.badRequest("Model pull is only available for the local Ollama provider");
         }
-        return pullModel(resolveConfig(settings));
+        AiRuntimeConfig config = resolveConfig(settings);
+        if (OllamaModelNames.looksLikeCloudApiModel(config.model())) {
+            throw new ApiException(
+                    "AI_MODEL_MISMATCH",
+                    OllamaModelNames.cloudApiModelHint(config.model()),
+                    HttpStatus.BAD_REQUEST);
+        }
+        return pullModel(config);
     }
 
     @Transactional(readOnly = true)
@@ -136,9 +144,17 @@ public class AiSettingsService {
                     storageHint
             );
         } catch (OllamaClient.OllamaException ex) {
+            String detail = ex.getMessage() == null ? "pull failed" : ex.getMessage();
+            boolean mismatch = OllamaModelNames.looksLikeCloudApiModel(config.model())
+                    || OllamaModelNames.looksLikeMissingLibraryModel(detail)
+                    || detail.contains("not an Ollama library model")
+                    || detail.contains("no library model named");
+            if (mismatch) {
+                throw new ApiException("AI_MODEL_MISMATCH", detail, HttpStatus.BAD_REQUEST);
+            }
             throw new ApiException(
                     "AI_PULL_FAILED",
-                    "Could not download “" + config.model() + "”: " + ex.getMessage()
+                    "Could not download “" + config.model() + "”: " + detail
                             + " Your AI settings stay enabled — fix Ollama connectivity and click Pull model again. "
                             + storageHint,
                     HttpStatus.BAD_GATEWAY);

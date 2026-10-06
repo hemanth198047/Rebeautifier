@@ -130,11 +130,17 @@ export function SettingsPage() {
 
   async function onSaveAi(event: FormEvent) {
     event.preventDefault()
-    setAiBusy(true)
     setAiMsg(null)
     setError(null)
     setPullProgress(null)
     const willPull = aiEnabled && aiProvider === 'OLLAMA' && pullOnSave
+    if (willPull && /^(gpt-|chatgpt-|o[0-9]|claude-|gemini-)/i.test(aiModel.trim())) {
+      setError(
+        `“${aiModel}” cannot be pulled into Ollama. Switch Provider to “API key (OpenAI-compatible)” for this model, or change Model to an Ollama name like llama3.2:1b before pulling.`,
+      )
+      return
+    }
+    setAiBusy(true)
     if (willPull) {
       setPullProgress(
         `Saving settings, then downloading “${aiModel}” into Ollama. This can take several minutes — leave this page open.`,
@@ -176,6 +182,12 @@ export function SettingsPage() {
   }
 
   async function onPullModel() {
+    if (/^(gpt-|chatgpt-|o[0-9]|claude-|gemini-)/i.test(aiModel.trim())) {
+      setError(
+        `“${aiModel}” is an API/cloud model id, not an Ollama library model. Switch Provider to “API key (OpenAI-compatible)”, add your API key, and Save — do not use Pull model. For local Ollama, use a name like llama3.2:1b.`,
+      )
+      return
+    }
     setPullBusy(true)
     setAiMsg(null)
     setError(null)
@@ -358,7 +370,9 @@ export function SettingsPage() {
                     checked={aiProvider === 'OLLAMA'}
                     onChange={() => {
                       setAiProvider('OLLAMA')
-                      if (!aiModel) setAiModel('llama3.2:1b')
+                      if (!aiModel || /^(gpt-|chatgpt-|o[0-9]|claude-|gemini-)/i.test(aiModel.trim())) {
+                        setAiModel('llama3.2:1b')
+                      }
                     }}
                   />
                   <span>Local Ollama</span>
@@ -370,7 +384,9 @@ export function SettingsPage() {
                     checked={aiProvider === 'OPENAI_COMPATIBLE'}
                     onChange={() => {
                       setAiProvider('OPENAI_COMPATIBLE')
-                      if (aiModel === 'llama3.2:1b') setAiModel('gpt-4o-mini')
+                      if (!aiModel || aiModel === 'llama3.2:1b' || /^(llama|mistral|qwen|phi|gemma)/i.test(aiModel.trim())) {
+                        setAiModel('gpt-4o-mini')
+                      }
                     }}
                   />
                   <span>API key (OpenAI-compatible)</span>
@@ -388,6 +404,11 @@ export function SettingsPage() {
                   placeholder={aiProvider === 'OLLAMA' ? 'llama3.2:1b' : 'gpt-4o-mini'}
                 />
               </label>
+              <p className="muted settings-note">
+                {aiProvider === 'OLLAMA'
+                  ? 'Ollama models look like llama3.2:1b or mistral. Names such as gpt-4o-mini need Provider “API key (OpenAI-compatible)” — they cannot be pulled into Ollama.'
+                  : 'Uses your API key against an OpenAI-compatible /chat/completions endpoint. No Ollama pull is needed.'}
+              </p>
 
               <label>
                 Base URL{' '}
