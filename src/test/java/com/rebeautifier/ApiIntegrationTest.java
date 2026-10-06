@@ -585,6 +585,16 @@ class ApiIntegrationTest {
                 .andReturn();
         assertThat(imported.getResponse().getContentAsString()).contains("/api/v1/covers/");
 
+        // In-place replace on the original book
+        mockMvc.perform(put("/api/v1/books/" + bookId + "/import")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(exportBody.replace("Integration Book", "Integration Book Replaced")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Integration Book Replaced"))
+                .andExpect(jsonPath("$.coverUrl").isNotEmpty());
+
         mockMvc.perform(get("/api/v1/books").session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(3)));
@@ -592,6 +602,35 @@ class ApiIntegrationTest {
 
     @Test
     @Order(10)
+    void transferOwnershipToExistingUser() throws Exception {
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username":"heir_%s",
+                                  "email":"heir_%s@example.com",
+                                  "password":"password123",
+                                  "displayName":"Heir"
+                                }
+                                """.formatted(suffix, suffix)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/v1/books/" + bookId + "/transfer")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"usernameOrEmail\":\"heir_%s\"}".formatted(suffix)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.myRole").value("EDITOR"));
+
+        mockMvc.perform(get("/api/v1/books/" + bookId + "/members").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.username=='heir_%s')].role".formatted(suffix)).value("OWNER"));
+    }
+
+    @Test
+    @Order(11)
     void logoutClearsSession() throws Exception {
         mockMvc.perform(post("/api/v1/auth/logout").session(session).with(csrf()))
                 .andExpect(status().isNoContent());

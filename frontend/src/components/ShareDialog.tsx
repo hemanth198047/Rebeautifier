@@ -12,6 +12,7 @@ export function ShareDialog({ bookId, open, onClose, onChanged }: Props) {
   const [members, setMembers] = useState<Member[]>([])
   const [usernameOrEmail, setUsernameOrEmail] = useState('')
   const [role, setRole] = useState<'EDITOR' | 'VIEWER'>('EDITOR')
+  const [transferTo, setTransferTo] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -73,6 +74,25 @@ export function ShareDialog({ bookId, open, onClose, onChanged }: Props) {
       await load()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not remove member')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function transfer(event: FormEvent) {
+    event.preventDefault()
+    if (!confirm(`Transfer ownership to ${transferTo}? You will become an Editor.`)) return
+    setBusy(true)
+    try {
+      await api(`/api/v1/books/${bookId}/transfer`, {
+        method: 'POST',
+        body: JSON.stringify({ usernameOrEmail: transferTo }),
+      })
+      setTransferTo('')
+      await load()
+      onChanged?.()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Transfer failed')
     } finally {
       setBusy(false)
     }
@@ -148,6 +168,23 @@ export function ShareDialog({ bookId, open, onClose, onChanged }: Props) {
             </li>
           ))}
         </ul>
+
+        <form className="share-form transfer-form" onSubmit={(e) => void transfer(e)}>
+          <h3>Transfer ownership</h3>
+          <p className="muted panel-sub">Hand the book to another account on this install. You stay as Editor.</p>
+          <label>
+            New owner (username or email)
+            <input
+              value={transferTo}
+              onChange={(e) => setTransferTo(e.target.value)}
+              required
+              placeholder="editor"
+            />
+          </label>
+          <button className="btn btn-ghost" type="submit" disabled={busy || !transferTo.trim()}>
+            Transfer ownership
+          </button>
+        </form>
       </div>
     </div>
   )

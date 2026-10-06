@@ -18,7 +18,15 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<Map<String, Object>> handleApi(ApiException ex) {
-        return ResponseEntity.status(ex.getStatus()).body(error(ex.getCode(), ex.getMessage(), null));
+        ResponseEntity.BodyBuilder builder = ResponseEntity.status(ex.getStatus());
+        if (ex.getRetryAfterSeconds() != null) {
+            builder.header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()));
+        }
+        Map<String, Object> body = error(ex.getCode(), ex.getMessage(), null);
+        if (ex.getRetryAfterSeconds() != null) {
+            body.put("retryAfterSeconds", ex.getRetryAfterSeconds());
+        }
+        return builder.body(body);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

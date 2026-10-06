@@ -49,6 +49,7 @@ public class RefinementService {
     private final AiConcurrencyGate concurrencyGate;
     private final ObjectMapper objectMapper;
     private final NoteService noteService;
+    private final RateLimitService rateLimitService;
 
     public RefinementService(NoteRepository noteRepository,
                              NoteRevisionRepository noteRevisionRepository,
@@ -57,7 +58,8 @@ public class RefinementService {
                              OllamaClient ollamaClient,
                              AiConcurrencyGate concurrencyGate,
                              ObjectMapper objectMapper,
-                             NoteService noteService) {
+                             NoteService noteService,
+                             RateLimitService rateLimitService) {
         this.noteRepository = noteRepository;
         this.noteRevisionRepository = noteRevisionRepository;
         this.accessControlService = accessControlService;
@@ -66,6 +68,7 @@ public class RefinementService {
         this.concurrencyGate = concurrencyGate;
         this.objectMapper = objectMapper;
         this.noteService = noteService;
+        this.rateLimitService = rateLimitService;
     }
 
     @Transactional(readOnly = true)
@@ -115,6 +118,7 @@ public class RefinementService {
 
     public NoteRevisionResponse refine(UUID noteId, RefineRequest request) {
         User user = authService.requireCurrentUser();
+        rateLimitService.checkAi(user.getId().toString());
         Note note = requireNote(noteId);
         accessControlService.requireRole(note.getBook().getId(), user, AccessControlService.editors());
 
