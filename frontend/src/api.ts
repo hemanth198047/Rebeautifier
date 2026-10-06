@@ -130,6 +130,8 @@ export type AiPullResult = {
   success: boolean
   message: string
   modelAvailable: boolean
+  nextStep: string | null
+  storageHint: string | null
 }
 
 export type RateLimitStatus = {
