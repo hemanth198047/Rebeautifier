@@ -123,6 +123,8 @@ Then visit http://localhost:8080 → sign in as `reader` / `password123` → ope
 | Sections | list/create/reorder under chapter; patch/delete by id |
 | Notes | list/create under book; get/patch/delete by id; reorder; draft/saved + content_version |
 | AI | `GET /system/ai-status`; note refinements create/list; accept/reject/regenerate |
+| Search | `GET /search?q=` ACL-scoped |
+| Backup | `GET /books/{id}/export?format=json\|markdown`; `POST /books/import` |
 | Health | `GET /health`, `GET /health/ready` |
 
 Auth uses an HTTP-only session cookie (`REBEAUTIFIER_SESSION`) plus CSRF (`XSRF-TOKEN` cookie / `X-XSRF-TOKEN` header) for mutating requests.
@@ -139,4 +141,4 @@ docker-compose.yml
 
 ## Phase status
 
-Phase 4 (complete AI review workflow) — polished compare/accept/reject/regenerate UX, save-before-refine, AI status chip, multi-user refine ACL. Search/export come next.
+Phase 5 (search, export, and recovery) — ACL-scoped search; Markdown + JSON export; validated JSON restore.

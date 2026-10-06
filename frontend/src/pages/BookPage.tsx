@@ -176,6 +176,9 @@ export function BookPage() {
                 <h1>{book.title}</h1>
                 <p className="muted">{book.description || 'No description yet.'}</p>
                 <div className="book-hero-actions">
+                  <Link className="btn btn-ghost" to="/backup">
+                    Backup
+                  </Link>
                   {isOwner && (
                     <button className="btn btn-primary" type="button" onClick={() => setShareOpen(true)}>
                       Share

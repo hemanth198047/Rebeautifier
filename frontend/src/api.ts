@@ -107,6 +107,25 @@ export type AiStatus = {
   setupHint: string
 }
 
+export type SearchHit = {
+  type: 'BOOK' | 'CHAPTER' | 'SECTION' | 'NOTE'
+  id: string
+  bookId: string
+  bookTitle: string
+  chapterId: string | null
+  chapterTitle: string | null
+  sectionId: string | null
+  sectionTitle: string | null
+  title: string
+  snippet: string | null
+  href: string
+}
+
+export type SearchResponse = {
+  query: string
+  hits: SearchHit[]
+}
+
 export class ApiError extends Error {
   code: string
   status: number
