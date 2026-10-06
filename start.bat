@@ -1,9 +1,10 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
-REM Start Rebeautifier (Postgres + API + SPA) via Docker Compose.
+REM Start Rebeautifier (Postgres + API + SPA + Ollama) via Docker Compose.
 REM Usage:
 REM   start.bat
+REM   start.bat --pull-model
 REM   start.bat --ai
 REM   start.bat --ai --pull-model
 REM   start.bat --no-rebuild
@@ -11,15 +12,14 @@ REM   start.bat --host-gateway
 
 cd /d "%~dp0"
 
-set "WITH_AI=0"
 set "PULL_MODEL=0"
 set "REBUILD=1"
 set "HOST_GATEWAY=0"
 
 :parse
 if "%~1"=="" goto parsed
-if /I "%~1"=="--ai" set "WITH_AI=1" & shift & goto parse
-if /I "%~1"=="/ai" set "WITH_AI=1" & shift & goto parse
+if /I "%~1"=="--ai" shift & goto parse
+if /I "%~1"=="/ai" shift & goto parse
 if /I "%~1"=="--pull-model" set "PULL_MODEL=1" & shift & goto parse
 if /I "%~1"=="--no-rebuild" set "REBUILD=0" & shift & goto parse
 if /I "%~1"=="--host-gateway" set "HOST_GATEWAY=1" & shift & goto parse
@@ -31,9 +31,9 @@ echo Unknown option: %~1
 goto help
 
 :help
-echo Usage: start.bat [--ai] [--pull-model] [--no-rebuild] [--host-gateway]
-echo   --ai            Also start the Ollama AI profile
+echo Usage: start.bat [--pull-model] [--ai] [--no-rebuild] [--host-gateway]
 echo   --pull-model    After start, pull the default Ollama model
+echo   --ai            Accepted for compatibility ^(Ollama always starts^)
 echo   --no-rebuild    Skip docker image rebuild
 echo   --host-gateway  Nested Docker / broken bridge networking
 exit /b 1
@@ -78,14 +78,11 @@ if "!HOST_GATEWAY!"=="1" (
   echo Using host-gateway Compose override.
 )
 
-set "PROFILE_ARGS="
-if "!WITH_AI!"=="1" set "PROFILE_ARGS=--profile ai"
-
 set "BUILD_ARGS="
 if "!REBUILD!"=="1" set "BUILD_ARGS=--build"
 
-echo Starting Rebeautifier ^(Compose^)...
-docker compose !FILE_ARGS! !PROFILE_ARGS! up !BUILD_ARGS! -d
+echo Starting Rebeautifier ^(Compose: db + api + ollama^)...
+docker compose !FILE_ARGS! up !BUILD_ARGS! -d
 if errorlevel 1 (
   echo Failed to start Compose services.
   exit /b 1
@@ -106,7 +103,7 @@ for /L %%I in (1,1,90) do (
 
 if "!READY!"=="0" (
   echo Timed out waiting for readiness. Recent logs:
-  docker compose !FILE_ARGS! !PROFILE_ARGS! logs --tail=80 api db
+  docker compose !FILE_ARGS! logs --tail=80 api db ollama
   if not "!HOST_GATEWAY!"=="1" (
     echo.
     echo If containers cannot reach each other, retry: start.bat --host-gateway
@@ -114,7 +111,7 @@ if "!READY!"=="0" (
   exit /b 1
 )
 
-if "!WITH_AI!"=="1" if "!PULL_MODEL!"=="1" (
+if "!PULL_MODEL!"=="1" (
   set "MODEL=llama3.2:1b"
   if exist ".env" (
     for /f "usebackq tokens=1,* delims== eol=#" %%A in (".env") do (
@@ -122,8 +119,11 @@ if "!WITH_AI!"=="1" if "!PULL_MODEL!"=="1" (
     )
   )
   echo Pulling Ollama model !MODEL! ^(may take a while^)...
-  docker compose !FILE_ARGS! --profile ai exec -T ollama ollama pull !MODEL!
-  if errorlevel 1 echo Model pull failed; AI will show offline until the model is available.
+  docker compose !FILE_ARGS! exec -T ollama ollama pull !MODEL!
+  if errorlevel 1 (
+    echo Model pull failed; AI will show offline until the model is available.
+    echo You can also pull from Settings - AI after signing in.
+  )
 )
 
 echo.
@@ -131,11 +131,11 @@ echo Rebeautifier is up.
 echo   Open:     !BASE_URL!
 echo   Demo:     reader / password123
 echo   Health:   !BASE_URL!/api/v1/health
-if "!WITH_AI!"=="1" (
-  echo   Stop:     stop.bat --ai
+if "!HOST_GATEWAY!"=="1" (
+  echo   Stop:     stop.bat --host-gateway
 ) else (
   echo   Stop:     stop.bat
-  echo   With AI:  start.bat --ai --pull-model
 )
+echo   Pull AI:  start.bat --pull-model
 echo.
 exit /b 0

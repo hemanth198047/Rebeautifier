@@ -74,9 +74,10 @@ public class OllamaClient {
             return new AiStatusProbe(true, true, "Mock Ollama enabled for tests", 1L, List.of(config.model()));
         }
         long started = System.currentTimeMillis();
+        String baseUrl = OllamaUrlResolver.findReachable(httpClient, config.baseUrl());
         try {
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(config.baseUrl() + "/api/tags"))
+                    .uri(URI.create(baseUrl + "/api/tags"))
                     .timeout(Duration.ofSeconds(4))
                     .GET()
                     .build();
@@ -99,12 +100,15 @@ public class OllamaClient {
             boolean hasModel = models.stream().anyMatch(n ->
                     n.equals(config.model()) || n.startsWith(config.model() + ":") || n.startsWith(config.model()));
             String message = hasModel
-                    ? "Ollama reachable; model available"
-                    : "Ollama reachable but model '" + config.model() + "' not pulled yet";
+                    ? "Ollama reachable at " + baseUrl + "; model available"
+                    : "Ollama reachable at " + baseUrl + " but model '" + config.model() + "' not pulled yet";
             return new AiStatusProbe(true, hasModel, message, latency, models);
         } catch (Exception ex) {
             long latency = System.currentTimeMillis() - started;
             log.debug("Ollama probe failed: {}", ex.toString());
+            if (OllamaUrlResolver.looksLikeDnsFailure(ex)) {
+                return AiStatusProbe.unavailable(OllamaUrlResolver.unresolvedHint(baseUrl), latency, List.of());
+            }
             return AiStatusProbe.unavailable(friendlyUnreachable(ex), latency, List.of());
         }
     }
@@ -117,6 +121,7 @@ public class OllamaClient {
         if (mockEnabled) {
             return "<p><strong>Mock refine</strong></p><p>" + escapeForMock(userPrompt) + "</p>";
         }
+        String baseUrl = OllamaUrlResolver.findReachable(httpClient, config.baseUrl());
         try {
             ObjectNode body = objectMapper.createObjectNode();
             body.put("model", config.model());
@@ -128,7 +133,7 @@ public class OllamaClient {
             options.put("num_predict", 2048);
 
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(config.baseUrl() + "/api/generate"))
+                    .uri(URI.create(baseUrl + "/api/generate"))
                     .timeout(timeout)
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
@@ -147,6 +152,9 @@ public class OllamaClient {
         } catch (OllamaException ex) {
             throw ex;
         } catch (Exception ex) {
+            if (OllamaUrlResolver.looksLikeDnsFailure(ex)) {
+                throw new OllamaException(OllamaUrlResolver.unresolvedHint(baseUrl), ex);
+            }
             throw new OllamaException("Ollama generate failed: " + shortMessage(ex), ex);
         }
     }
@@ -155,12 +163,16 @@ public class OllamaClient {
         if (mockEnabled) {
             return new PullResult(true, "Mock pull succeeded for " + config.model());
         }
+        String baseUrl = OllamaUrlResolver.findReachable(httpClient, config.baseUrl());
+        if (!OllamaUrlResolver.isReachable(httpClient, baseUrl)) {
+            throw new OllamaException(OllamaUrlResolver.unresolvedHint(config.baseUrl()));
+        }
         try {
             ObjectNode body = objectMapper.createObjectNode();
             body.put("name", config.model());
             body.put("stream", false);
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(config.baseUrl() + "/api/pull"))
+                    .uri(URI.create(baseUrl + "/api/pull"))
                     .timeout(Duration.ofMinutes(20))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
@@ -170,10 +182,23 @@ public class OllamaClient {
                 throw new OllamaException("Ollama pull failed with HTTP " + response.statusCode()
                         + (response.body() != null && !response.body().isBlank() ? ": " + truncate(response.body(), 200) : ""));
             }
-            return new PullResult(true, "Pulled model " + config.model());
+            // Ollama may return 200 with an error payload when registry DNS/network fails.
+            if (response.body() != null && response.body().toLowerCase().contains("error")) {
+                JsonNode root = objectMapper.readTree(response.body());
+                String err = root.path("error").asText(null);
+                if (err != null && !err.isBlank()) {
+                    throw new OllamaException("Ollama could not download the model: " + truncate(err, 240)
+                            + " The Ollama service is reachable at " + baseUrl
+                            + ", but it could not fetch from the model registry. Check outbound internet from the ollama container.");
+                }
+            }
+            return new PullResult(true, "Pulled model " + config.model() + " via " + baseUrl);
         } catch (OllamaException ex) {
             throw ex;
         } catch (Exception ex) {
+            if (OllamaUrlResolver.looksLikeDnsFailure(ex)) {
+                throw new OllamaException(OllamaUrlResolver.unresolvedHint(baseUrl), ex);
+            }
             throw new OllamaException("Ollama pull failed: " + shortMessage(ex), ex);
         }
     }
@@ -183,17 +208,15 @@ public class OllamaClient {
     }
 
     private static String trimTrailingSlash(String url) {
-        if (url == null || url.isBlank()) {
-            return "http://localhost:11434";
-        }
-        return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+        return OllamaUrlResolver.trimTrailingSlash(url);
     }
 
     private static String friendlyUnreachable(Exception ex) {
         String detail = shortMessage(ex);
         String lower = detail.toLowerCase();
         if (lower.contains("connect") || lower.contains("timed out") || lower.contains("unreachable")
-                || lower.contains("unknown host") || lower.contains("connection refused")) {
+                || lower.contains("unknown host") || lower.contains("connection refused")
+                || lower.contains("unresolved")) {
             return "Ollama is not running or not reachable at the configured URL";
         }
         return "Ollama unreachable: " + detail;

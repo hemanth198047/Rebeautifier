@@ -3,8 +3,8 @@
 #
 #   docker compose -f docker-compose.yml -f docker-compose.host-gateway.yml up --build
 #
-# Publishes DB/Ollama on all host interfaces so host-gateway can reach them
-# (the base compose binds those ports to 127.0.0.1 only).
+# Publishes DB/Ollama on the host and remaps service names to host-gateway
+# so the API container can reach them when Compose DNS is broken.
 services:
   db:
     ports:

@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Start Rebeautifier (Postgres + API + SPA) via Docker Compose.
+# Start Rebeautifier (Postgres + API + SPA + Ollama) via Docker Compose.
 #
 # Usage:
-#   ./start.sh              # core stack (db + api)
-#   ./start.sh --ai         # also start Ollama profile
-#   ./start.sh --ai --pull-model   # start AI and pull default model
+#   ./start.sh                     # core stack (db + api + ollama)
+#   ./start.sh --pull-model        # also pull the default Ollama model
+#   ./start.sh --ai                # accepted for compatibility (Ollama always starts)
+#   ./start.sh --ai --pull-model   # same as --pull-model
 #   ./start.sh --host-gateway      # nested-Docker / broken bridge networking
-#   ./start.sh --foreground # attach to compose logs
-#   ./start.sh --rebuild    # force image rebuild (default)
+#   ./start.sh --foreground        # attach to compose logs
+#   ./start.sh --rebuild           # force image rebuild (default)
 #   ./start.sh --no-rebuild
 #
 set -euo pipefail
@@ -15,7 +16,6 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
-WITH_AI=0
 PULL_MODEL=0
 FOREGROUND=0
 REBUILD=1
@@ -23,13 +23,13 @@ HOST_GATEWAY="${REBEAUTIFIER_HOST_GATEWAY:-0}"
 DETACH_ARGS=(-d)
 
 usage() {
-  sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --ai) WITH_AI=1 ;;
+    --ai) ;; # Ollama is always started; keep flag for older docs/scripts
     --pull-model) PULL_MODEL=1 ;;
     --host-gateway) HOST_GATEWAY=1 ;;
     --foreground|-f) FOREGROUND=1; DETACH_ARGS=() ;;
@@ -74,11 +74,6 @@ if [[ "$HOST_GATEWAY" == "1" ]]; then
   echo "Using host-gateway Compose override (nested Docker / broken bridge)."
 fi
 
-PROFILE_ARGS=()
-if [[ "$WITH_AI" -eq 1 ]]; then
-  PROFILE_ARGS=(--profile ai)
-fi
-
 BUILD_ARGS=()
 if [[ "$REBUILD" -eq 1 ]]; then
   BUILD_ARGS=(--build)
@@ -88,8 +83,8 @@ API_PORT="$(grep -E '^[[:space:]]*API_PORT=' .env 2>/dev/null | tail -n1 | cut -
 API_PORT="${API_PORT:-8080}"
 BASE_URL="http://localhost:${API_PORT}"
 
-echo "Starting Rebeautifier (Compose)..."
-"${COMPOSE[@]}" "${FILE_ARGS[@]}" "${PROFILE_ARGS[@]}" up "${BUILD_ARGS[@]}" "${DETACH_ARGS[@]}"
+echo "Starting Rebeautifier (Compose: db + api + ollama)..."
+"${COMPOSE[@]}" "${FILE_ARGS[@]}" up "${BUILD_ARGS[@]}" "${DETACH_ARGS[@]}"
 
 if [[ "$FOREGROUND" -eq 1 ]]; then
   exit 0
@@ -108,26 +103,26 @@ done
 
 if [[ "$ready" -ne 1 ]]; then
   echo "Timed out waiting for readiness. Recent logs:" >&2
-  "${COMPOSE[@]}" "${FILE_ARGS[@]}" "${PROFILE_ARGS[@]}" logs --tail=80 api db || true
+  "${COMPOSE[@]}" "${FILE_ARGS[@]}" logs --tail=80 api db ollama || true
   if [[ "$HOST_GATEWAY" != "1" ]]; then
     echo >&2
     echo "If containers cannot reach each other (nested Docker / cloud agents), retry:" >&2
-    echo "  ./start.sh --host-gateway$([ "$WITH_AI" -eq 1 ] && echo ' --ai')" >&2
+    echo "  ./start.sh --host-gateway" >&2
   fi
   exit 1
 fi
 
-if [[ "$WITH_AI" -eq 1 && "$PULL_MODEL" -eq 1 ]]; then
+if [[ "$PULL_MODEL" -eq 1 ]]; then
   MODEL="$(grep -E '^[[:space:]]*OLLAMA_MODEL=' .env 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d '\r' || true)"
   MODEL="${MODEL:-llama3.2:1b}"
   echo "Pulling Ollama model ${MODEL} (may take a while)..."
-  "${COMPOSE[@]}" "${FILE_ARGS[@]}" --profile ai exec -T ollama ollama pull "$MODEL" || {
+  "${COMPOSE[@]}" "${FILE_ARGS[@]}" exec -T ollama ollama pull "$MODEL" || {
     echo "Model pull failed; AI will show offline until the model is available." >&2
+    echo "You can also pull from Settings → AI after signing in." >&2
   }
 fi
 
 STOP_EXTRA=""
-[[ "$WITH_AI" -eq 1 ]] && STOP_EXTRA+=" --ai"
 [[ "$HOST_GATEWAY" == "1" ]] && STOP_EXTRA+=" --host-gateway"
 
 echo
@@ -136,7 +131,5 @@ echo "  Open:     ${BASE_URL}"
 echo "  Demo:     reader / password123"
 echo "  Health:   ${BASE_URL}/api/v1/health"
 echo "  Stop:     ./stop.sh${STOP_EXTRA}"
-if [[ "$WITH_AI" -eq 0 ]]; then
-  echo "  With AI:  ./start.sh --ai --pull-model"
-fi
+echo "  Pull AI:  ./start.sh --pull-model   (or Settings → AI → Pull model)"
 echo

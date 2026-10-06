@@ -1,7 +1,8 @@
-# Start Rebeautifier (Postgres + API + SPA) via Docker Compose.
+# Start Rebeautifier (Postgres + API + SPA + Ollama) via Docker Compose.
 #
 # Usage:
 #   .\start.ps1
+#   .\start.ps1 -PullModel
 #   .\start.ps1 -Ai
 #   .\start.ps1 -Ai -PullModel
 #   .\start.ps1 -HostGateway
@@ -9,7 +10,7 @@
 
 [CmdletBinding()]
 param(
-    [switch]$Ai,
+    [switch]$Ai, # accepted for compatibility; Ollama always starts
     [switch]$PullModel,
     [switch]$NoRebuild,
     [switch]$HostGateway
@@ -51,12 +52,11 @@ if ($HostGateway -or $env:REBEAUTIFIER_HOST_GATEWAY -eq '1') {
     $composeArgs += @('-f', 'docker-compose.host-gateway.yml')
     Write-Host 'Using host-gateway Compose override (nested Docker / broken bridge).'
 }
-if ($Ai) { $composeArgs += @('--profile', 'ai') }
 $composeArgs += 'up'
 if (-not $NoRebuild) { $composeArgs += '--build' }
 $composeArgs += '-d'
 
-Write-Host 'Starting Rebeautifier (Compose)...'
+Write-Host 'Starting Rebeautifier (Compose: db + api + ollama)...'
 & docker compose @composeArgs
 if ($LASTEXITCODE -ne 0) { throw 'Failed to start Compose services.' }
 
@@ -80,15 +80,14 @@ if (-not $ready) {
     if ($HostGateway -or $env:REBEAUTIFIER_HOST_GATEWAY -eq '1') {
         $logArgs += @('-f', 'docker-compose.host-gateway.yml')
     }
-    if ($Ai) { $logArgs += @('--profile', 'ai') }
-    & docker compose @logArgs logs --tail=80 api db
+    & docker compose @logArgs logs --tail=80 api db ollama
     if (-not ($HostGateway -or $env:REBEAUTIFIER_HOST_GATEWAY -eq '1')) {
         Write-Host 'If containers cannot reach each other, retry: .\start.ps1 -HostGateway'
     }
     throw 'API readiness timed out.'
 }
 
-if ($Ai -and $PullModel) {
+if ($PullModel) {
     $model = 'llama3.2:1b'
     if (Test-Path '.env') {
         Get-Content '.env' | ForEach-Object {
@@ -100,10 +99,11 @@ if ($Ai -and $PullModel) {
     if ($HostGateway -or $env:REBEAUTIFIER_HOST_GATEWAY -eq '1') {
         $pullArgs += @('-f', 'docker-compose.host-gateway.yml')
     }
-    $pullArgs += @('--profile', 'ai', 'exec', '-T', 'ollama', 'ollama', 'pull', $model)
+    $pullArgs += @('exec', '-T', 'ollama', 'ollama', 'pull', $model)
     & docker compose @pullArgs
     if ($LASTEXITCODE -ne 0) {
         Write-Warning 'Model pull failed; AI will show offline until the model is available.'
+        Write-Host 'You can also pull from Settings → AI after signing in.'
     }
 }
 
@@ -113,10 +113,7 @@ Write-Host "  Open:     $baseUrl"
 Write-Host '  Demo:     reader / password123'
 Write-Host "  Health:   $baseUrl/api/v1/health"
 $stopCmd = '.\stop.ps1'
-if ($Ai) { $stopCmd += ' -Ai' }
 if ($HostGateway -or $env:REBEAUTIFIER_HOST_GATEWAY -eq '1') { $stopCmd += ' -HostGateway' }
 Write-Host "  Stop:     $stopCmd"
-if (-not $Ai) {
-    Write-Host '  With AI:  .\start.ps1 -Ai -PullModel'
-}
+Write-Host '  Pull AI:  .\start.ps1 -PullModel'
 Write-Host ''

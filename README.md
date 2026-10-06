@@ -11,7 +11,7 @@ A calm, installable reading library for organizing thoughts as **Book → Chapte
 - Spring Security (cookie session)
 - React + Vite + TypeScript SPA (`frontend/`)
 - TipTap rich-text notes
-- Docker Compose (`api` + `db`, optional `ollama` profile)
+- Docker Compose (`api` + `db` + `ollama`)
 - Ollama HTTP API (local only)
 
 ## Quick start (Docker Compose)
@@ -21,8 +21,8 @@ Requirements: Docker and Docker Compose.
 **Linux / macOS**
 
 ```bash
-./start.sh                 # builds and starts db + api (SPA on :8080)
-./start.sh --ai --pull-model   # optional local Ollama
+./start.sh                 # builds and starts db + api + ollama (SPA on :8080)
+./start.sh --pull-model    # also pull the default Ollama model
 ./stop.sh                  # stop (keeps volumes)
 ./stop.sh --purge          # stop and delete volumes
 ```
@@ -31,12 +31,12 @@ Requirements: Docker and Docker Compose.
 
 ```bat
 start.bat
-start.bat --ai --pull-model
+start.bat --pull-model
 stop.bat
 stop.bat --purge
 ```
 
-PowerShell alternatives: `.\start.ps1`, `.\stop.ps1` (flags: `-Ai`, `-PullModel`, `-HostGateway`, `-Purge`).
+PowerShell alternatives: `.\start.ps1`, `.\stop.ps1` (flags: `-PullModel`, `-HostGateway`, `-Purge`; `-Ai` kept for compatibility).
 
 Nested Docker / broken bridge networking:
 
@@ -64,17 +64,16 @@ Optional env file: copy [`.env.example`](./.env.example) to `.env` (created auto
 
 ### Optional AI (Ollama or API key)
 
-In the app: **Settings → AI** — enable/disable, choose **Local Ollama** or an **OpenAI-compatible API key**, set the model, and (for Ollama) **Pull model** from the UI. Notes still work when AI is disabled.
-
-Optional Compose helper to run a local Ollama sidecar:
+Compose always starts the `ollama` sidecar. In the app: **Settings → AI** — enable/disable, choose **Local Ollama** or an **OpenAI-compatible API key**, set the model, and (for Ollama) **Pull model** from the UI. Notes still work when AI is disabled.
 
 ```bash
-./start.sh --ai
-# or:
-docker compose --profile ai up --build
+./start.sh --pull-model
+# or after start:
+docker compose exec ollama ollama pull llama3.2:1b
 ```
 
-Default Ollama model: `llama3.2:1b` (4 GB RAM friendly). Override defaults with `OLLAMA_MODEL` / `OLLAMA_BASE_URL` if needed.
+Default Ollama model: `llama3.2:1b` (4 GB RAM friendly). Override defaults with `OLLAMA_MODEL` / `OLLAMA_BASE_URL` (Compose default `http://ollama:11434`) if needed. The API also tries `host.docker.internal` and localhost when the preferred URL cannot be resolved.
+
 
 Stop:
 
