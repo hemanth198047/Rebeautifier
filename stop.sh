@@ -3,7 +3,7 @@
 #
 # Usage:
 #   ./stop.sh                 # stop containers; keep data volumes
-#   ./stop.sh --ai            # include AI profile services
+#   ./stop.sh --ai            # accepted for compatibility (Ollama always included)
 #   ./stop.sh --host-gateway  # match start.sh --host-gateway
 #   ./stop.sh --purge         # also delete volumes (db/covers/ollama data)
 #
@@ -12,7 +12,6 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
-WITH_AI=0
 PURGE=0
 HOST_GATEWAY="${REBEAUTIFIER_HOST_GATEWAY:-0}"
 
@@ -23,7 +22,7 @@ usage() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --ai) WITH_AI=1 ;;
+    --ai) ;; # Ollama is always part of the stack
     --host-gateway) HOST_GATEWAY=1 ;;
     --purge|--volumes|-v) PURGE=1 ;;
     -h|--help) usage 0 ;;
@@ -54,11 +53,6 @@ if [[ "$HOST_GATEWAY" == "1" ]]; then
   FILE_ARGS+=(-f docker-compose.host-gateway.yml)
 fi
 
-PROFILE_ARGS=()
-if [[ "$WITH_AI" -eq 1 ]]; then
-  PROFILE_ARGS=(--profile ai)
-fi
-
 DOWN_ARGS=()
 if [[ "$PURGE" -eq 1 ]]; then
   DOWN_ARGS=(-v)
@@ -67,5 +61,5 @@ else
   echo "Stopping Rebeautifier (volumes kept)..."
 fi
 
-"${COMPOSE[@]}" "${FILE_ARGS[@]}" "${PROFILE_ARGS[@]}" down "${DOWN_ARGS[@]}"
+"${COMPOSE[@]}" "${FILE_ARGS[@]}" down "${DOWN_ARGS[@]}"
 echo "Stopped."

@@ -4,10 +4,11 @@ Use after a clean install (Compose recommended). Mark each item when verified.
 
 ## Install paths
 
-- [ ] `docker compose up --build` starts `db` + `api` without AI
+- [ ] `docker compose up --build` starts `db` + `api` + `ollama`
 - [ ] http://localhost:8080 serves the SPA
 - [ ] Demo login `reader` / `password123` works (when seeding is on)
-- [ ] `docker compose --profile ai up --build` starts Ollama; pull `llama3.2:1b` succeeds
+- [ ] `docker compose exec ollama ollama pull llama3.2:1b` succeeds (or in-app Pull model)
+
 - [ ] Non-Docker path in `SETUP.md` runs API + Vite against local Postgres
 - [ ] `./scripts/smoke-check.sh` exits 0 against a running install
 

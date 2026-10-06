@@ -30,9 +30,10 @@ The start scripts copy `.env.example` → `.env` when needed, run `docker compos
 
 | Script | Platform | Notes |
 | --- | --- | --- |
-| `start.sh` / `stop.sh` | Linux, macOS | `--ai`, `--pull-model`, `--host-gateway`, `--purge` |
-| `start.bat` / `stop.bat` | Windows CMD | `--ai`, `--pull-model`, `--host-gateway`, `--purge` |
-| `start.ps1` / `stop.ps1` | Windows PowerShell | `-Ai`, `-PullModel`, `-HostGateway`, `-Purge` |
+| `start.sh` / `stop.sh` | Linux, macOS | `--pull-model`, `--host-gateway`, `--purge` (`--ai` accepted for compatibility) |
+| `start.bat` / `stop.bat` | Windows CMD | `--pull-model`, `--host-gateway`, `--purge` (`--ai` accepted for compatibility) |
+| `start.ps1` / `stop.ps1` | Windows PowerShell | `-PullModel`, `-HostGateway`, `-Purge` (`-Ai` accepted for compatibility) |
+
 
 Demo users (when `SEED_DEMO_DATA=true`, the default for Compose):
 
@@ -48,16 +49,19 @@ Stop:
 # Windows: stop.bat
 ```
 
-Data persists in volumes: `pgdata` (Postgres), `covers` (book cover files), `ollama` (models when AI profile is used).
+Data persists in volumes: `pgdata` (Postgres), `covers` (book cover files), `ollama` (downloaded models).
 
-### Optional local AI
+### Local AI (Ollama)
+
+Compose starts the `ollama` service with the stack. Pull a model from the CLI or from **Settings → AI**:
 
 ```bash
-./start.sh --ai --pull-model
-# Windows: start.bat --ai --pull-model
+./start.sh --pull-model
+# Windows: start.bat --pull-model
 ```
 
-Default model `llama3.2:1b` targets ~4 GB RAM hosts with concurrency `1`. Notes still work when Ollama is absent — Settings and the AI chip show offline guidance.
+Default model `llama3.2:1b` targets ~4 GB RAM hosts with concurrency `1`. Notes still work when the model is not pulled yet — Settings and the AI chip show offline guidance. If pull fails with a DNS / unresolved-host error, restart with `./start.sh` so `ollama` is running and keep Base URL as `http://ollama:11434` (Compose) or leave it blank.
+
 
 ### Production-ish Compose tips
 

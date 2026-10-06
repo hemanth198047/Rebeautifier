@@ -392,7 +392,7 @@ export function SettingsPage() {
               <label>
                 Base URL{' '}
                 {aiProvider === 'OLLAMA'
-                  ? '(optional — defaults to install Ollama URL)'
+                  ? '(optional — Compose default http://ollama:11434; leave blank to auto-detect)'
                   : '(optional — defaults to https://api.openai.com/v1)'}
                 <input
                   value={aiBaseUrl}
@@ -401,6 +401,15 @@ export function SettingsPage() {
                   placeholder={aiProvider === 'OLLAMA' ? 'http://ollama:11434' : 'https://api.openai.com/v1'}
                 />
               </label>
+              {aiProvider === 'OLLAMA' && (
+                <p className="muted settings-note">
+                  Docker Compose includes the <code>ollama</code> service. Prefer{' '}
+                  <code>http://ollama:11434</code> inside Compose, or{' '}
+                  <code>http://host.docker.internal:11434</code> / <code>http://127.0.0.1:11434</code> for a host
+                  install. If pull fails with an unresolved-host error, restart with <code>./start.sh</code> (or{' '}
+                  <code>start.bat</code>) and try again.
+                </p>
+              )}
 
               {aiProvider === 'OPENAI_COMPATIBLE' && (
                 <>

@@ -4,10 +4,11 @@
 #   .\stop.ps1
 #   .\stop.ps1 -Ai
 #   .\stop.ps1 -Purge
+#   .\stop.ps1 -HostGateway
 
 [CmdletBinding()]
 param(
-    [switch]$Ai,
+    [switch]$Ai, # accepted for compatibility; Ollama always included
     [switch]$Purge,
     [switch]$HostGateway
 )
@@ -27,7 +28,6 @@ $composeArgs = @('-f', 'docker-compose.yml')
 if ($HostGateway -or $env:REBEAUTIFIER_HOST_GATEWAY -eq '1') {
     $composeArgs += @('-f', 'docker-compose.host-gateway.yml')
 }
-if ($Ai) { $composeArgs += @('--profile', 'ai') }
 $composeArgs += 'down'
 if ($Purge) {
     $composeArgs += '-v'
