@@ -9,6 +9,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
@@ -529,7 +530,7 @@ class ApiIntegrationTest {
         // Minimal 1x1 PNG
         byte[] png = Base64.getDecoder().decode(
                 "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
-        mockMvc.perform(multipart("/api/v1/books/" + bookId + "/cover")
+        mockMvc.perform(multipart(HttpMethod.PUT, "/api/v1/books/" + bookId + "/cover")
                         .file(new MockMultipartFile("file", "cover.png", "image/png", png))
                         .session(session)
                         .with(csrf()))
@@ -549,7 +550,7 @@ class ApiIntegrationTest {
                 .andReturn();
         String exportBody = jsonExport.getResponse().getContentAsString();
         assertThat(exportBody).contains("rebeautifier.book-backup");
-        assertThat(exportBody).contains("\"schemaVersion\":2");
+        assertThat(exportBody).containsPattern("\"schemaVersion\"\\s*:\\s*2");
         assertThat(exportBody).contains("coverBase64");
         assertThat(exportBody).contains("image/png");
 
