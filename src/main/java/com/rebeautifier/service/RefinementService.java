@@ -81,9 +81,10 @@ public class RefinementService {
         authService.requireCurrentUser();
         OllamaClient.AiStatusProbe probe = ollamaClient.probe();
         boolean available = probe.reachable() && probe.modelAvailable();
-        String setup = "Install Ollama from https://ollama.com, run `ollama pull "
+        String setup = "Start with AI enabled (`./start.sh --ai --pull-model` or `start.bat --ai --pull-model`), "
+                + "or install Ollama from https://ollama.com and run `ollama pull "
                 + ollamaClient.configuredModel()
-                + "`, and set OLLAMA_BASE_URL if needed. Notes still work while AI is offline.";
+                + "`. Set OLLAMA_BASE_URL if Ollama is not on the default host. Notes still work while AI is offline.";
         AiMetrics.Snapshot metrics = aiMetrics.snapshot();
         return new AiStatusResponse(
                 available,
