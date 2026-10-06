@@ -2,22 +2,26 @@ package com.rebeautifier.service;
 
 import com.rebeautifier.domain.Book;
 import com.rebeautifier.domain.Chapter;
-import com.rebeautifier.domain.Note;
 import com.rebeautifier.domain.Section;
 import com.rebeautifier.domain.User;
 import com.rebeautifier.repository.BookRepository;
 import com.rebeautifier.repository.ChapterRepository;
-import com.rebeautifier.repository.NoteRepository;
 import com.rebeautifier.repository.SectionRepository;
 import com.rebeautifier.web.dto.SearchResponse;
 import com.rebeautifier.web.error.ApiException;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -31,18 +35,18 @@ public class SearchService {
     private final BookRepository bookRepository;
     private final ChapterRepository chapterRepository;
     private final SectionRepository sectionRepository;
-    private final NoteRepository noteRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public SearchService(AuthService authService,
                          BookRepository bookRepository,
                          ChapterRepository chapterRepository,
-                         SectionRepository sectionRepository,
-                         NoteRepository noteRepository) {
+                         SectionRepository sectionRepository) {
         this.authService = authService;
         this.bookRepository = bookRepository;
         this.chapterRepository = chapterRepository;
         this.sectionRepository = sectionRepository;
-        this.noteRepository = noteRepository;
     }
 
     @Transactional(readOnly = true)
@@ -60,99 +64,209 @@ public class SearchService {
         if (accessible.isEmpty()) {
             return new SearchResponse(query, List.of());
         }
-        Set<UUID> bookIds = accessible.stream().map(Book::getId).collect(Collectors.toSet());
+        Map<UUID, Book> booksById = accessible.stream()
+                .collect(Collectors.toMap(Book::getId, b -> b, (a, b) -> a, LinkedHashMap::new));
+        Set<UUID> bookIds = booksById.keySet();
         String needle = query.toLowerCase(Locale.ROOT);
+        String like = "%" + escapeLike(needle) + "%";
 
-        List<SearchResponse.SearchHit> hits = new ArrayList<>();
+        Map<String, RankedHit> hits = new LinkedHashMap<>();
 
-        for (Book book : accessible) {
-            if (contains(book.getTitle(), needle) || contains(book.getDescription(), needle)) {
-                hits.add(new SearchResponse.SearchHit(
-                        "BOOK",
-                        book.getId(),
-                        book.getId(),
-                        book.getTitle(),
-                        null, null, null, null,
-                        book.getTitle(),
-                        snippet(book.getDescription(), needle),
-                        "/books/" + book.getId()
-                ));
-            }
-        }
+        collectBooks(hits, booksById, bookIds, query, like, needle);
+        collectChapters(hits, booksById, bookIds, query, like);
+        collectSections(hits, booksById, bookIds, query, like);
+        collectNotes(hits, booksById, bookIds, query, like, needle);
 
-        for (UUID bookId : bookIds) {
-            Book book = accessible.stream().filter(b -> b.getId().equals(bookId)).findFirst().orElse(null);
+        List<SearchResponse.SearchHit> ordered = hits.values().stream()
+                .sorted(Comparator
+                        .comparingDouble(RankedHit::rank).reversed()
+                        .thenComparingInt(RankedHit::typeRank)
+                        .thenComparing(h -> h.hit().title() == null ? "" : h.hit().title().toLowerCase(Locale.ROOT)))
+                .limit(MAX_HITS)
+                .map(RankedHit::hit)
+                .toList();
+
+        return new SearchResponse(query, ordered);
+    }
+
+    private void collectBooks(Map<String, RankedHit> hits, Map<UUID, Book> booksById, Set<UUID> bookIds,
+                              String query, String like, String needle) {
+        Query bookQuery = entityManager.createNativeQuery("""
+                SELECT b.id::text,
+                       ts_rank(
+                         to_tsvector('english', coalesce(b.title,'') || ' ' || coalesce(b.description,'')),
+                         plainto_tsquery('english', :q)
+                       ) AS rank
+                FROM books b
+                WHERE b.id IN (:bookIds)
+                  AND (
+                    to_tsvector('english', coalesce(b.title,'') || ' ' || coalesce(b.description,''))
+                        @@ plainto_tsquery('english', :q)
+                    OR lower(b.title) LIKE :like ESCAPE '\\'
+                    OR lower(coalesce(b.description,'')) LIKE :like ESCAPE '\\'
+                  )
+                """);
+        bookQuery.setParameter("q", query);
+        bookQuery.setParameter("like", like);
+        bookQuery.setParameter("bookIds", bookIds);
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = bookQuery.getResultList();
+        for (Object[] row : rows) {
+            UUID id = UUID.fromString((String) row[0]);
+            Book book = booksById.get(id);
             if (book == null) continue;
-            List<Chapter> chapters = chapterRepository.findByBookIdOrderByPositionAsc(bookId);
-            for (Chapter chapter : chapters) {
-                if (contains(chapter.getTitle(), needle)) {
-                    hits.add(new SearchResponse.SearchHit(
-                            "CHAPTER",
-                            chapter.getId(),
-                            bookId,
-                            book.getTitle(),
-                            chapter.getId(),
-                            chapter.getTitle(),
-                            null, null,
-                            chapter.getTitle(),
-                            null,
-                            "/books/" + bookId + "/chapters/" + chapter.getId()
-                    ));
-                }
-                List<Section> sections = sectionRepository.findByChapterIdOrderByPositionAsc(chapter.getId());
-                for (Section section : sections) {
-                    if (contains(section.getTitle(), needle)) {
-                        hits.add(new SearchResponse.SearchHit(
-                                "SECTION",
-                                section.getId(),
-                                bookId,
-                                book.getTitle(),
-                                chapter.getId(),
-                                chapter.getTitle(),
-                                section.getId(),
-                                section.getTitle(),
-                                section.getTitle(),
-                                null,
-                                "/books/" + bookId + "/chapters/" + chapter.getId() + "/sections/" + section.getId()
-                        ));
-                    }
+            double rank = row[1] != null ? ((Number) row[1]).doubleValue() : 0;
+            put(hits, "BOOK:" + id, rank, "BOOK", new SearchResponse.SearchHit(
+                    "BOOK", id, id, book.getTitle(),
+                    null, null, null, null,
+                    book.getTitle(),
+                    snippet(book.getDescription(), needle),
+                    "/books/" + id
+            ));
+        }
+    }
+
+    private void collectChapters(Map<String, RankedHit> hits, Map<UUID, Book> booksById, Set<UUID> bookIds,
+                                 String query, String like) {
+        Query chapterQuery = entityManager.createNativeQuery("""
+                SELECT c.id::text, c.book_id::text, c.title,
+                       ts_rank(to_tsvector('english', coalesce(c.title,'')), plainto_tsquery('english', :q)) AS rank
+                FROM chapters c
+                WHERE c.book_id IN (:bookIds)
+                  AND (
+                    to_tsvector('english', coalesce(c.title,'')) @@ plainto_tsquery('english', :q)
+                    OR lower(c.title) LIKE :like ESCAPE '\\'
+                  )
+                """);
+        chapterQuery.setParameter("q", query);
+        chapterQuery.setParameter("like", like);
+        chapterQuery.setParameter("bookIds", bookIds);
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = chapterQuery.getResultList();
+        for (Object[] row : rows) {
+            UUID chapterId = UUID.fromString((String) row[0]);
+            UUID bookId = UUID.fromString((String) row[1]);
+            String title = (String) row[2];
+            Book book = booksById.get(bookId);
+            if (book == null) continue;
+            double rank = row[3] != null ? ((Number) row[3]).doubleValue() : 0;
+            put(hits, "CHAPTER:" + chapterId, rank, "CHAPTER", new SearchResponse.SearchHit(
+                    "CHAPTER", chapterId, bookId, book.getTitle(),
+                    chapterId, title, null, null,
+                    title, null,
+                    "/books/" + bookId + "/chapters/" + chapterId
+            ));
+        }
+    }
+
+    private void collectSections(Map<String, RankedHit> hits, Map<UUID, Book> booksById, Set<UUID> bookIds,
+                                 String query, String like) {
+        Query sectionQuery = entityManager.createNativeQuery("""
+                SELECT s.id::text, c.book_id::text, c.id::text, c.title, s.title,
+                       ts_rank(to_tsvector('english', coalesce(s.title,'')), plainto_tsquery('english', :q)) AS rank
+                FROM sections s
+                JOIN chapters c ON c.id = s.chapter_id
+                WHERE c.book_id IN (:bookIds)
+                  AND (
+                    to_tsvector('english', coalesce(s.title,'')) @@ plainto_tsquery('english', :q)
+                    OR lower(s.title) LIKE :like ESCAPE '\\'
+                  )
+                """);
+        sectionQuery.setParameter("q", query);
+        sectionQuery.setParameter("like", like);
+        sectionQuery.setParameter("bookIds", bookIds);
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = sectionQuery.getResultList();
+        for (Object[] row : rows) {
+            UUID sectionId = UUID.fromString((String) row[0]);
+            UUID bookId = UUID.fromString((String) row[1]);
+            UUID chapterId = UUID.fromString((String) row[2]);
+            String chapterTitle = (String) row[3];
+            String sectionTitle = (String) row[4];
+            Book book = booksById.get(bookId);
+            if (book == null) continue;
+            double rank = row[5] != null ? ((Number) row[5]).doubleValue() : 0;
+            put(hits, "SECTION:" + sectionId, rank, "SECTION", new SearchResponse.SearchHit(
+                    "SECTION", sectionId, bookId, book.getTitle(),
+                    chapterId, chapterTitle, sectionId, sectionTitle,
+                    sectionTitle, null,
+                    "/books/" + bookId + "/chapters/" + chapterId + "/sections/" + sectionId
+            ));
+        }
+    }
+
+    private void collectNotes(Map<String, RankedHit> hits, Map<UUID, Book> booksById, Set<UUID> bookIds,
+                              String query, String like, String needle) {
+        Query noteQuery = entityManager.createNativeQuery("""
+                SELECT n.id::text, n.book_id::text, n.chapter_id::text, n.section_id::text,
+                       n.title, n.body_plain,
+                       ts_rank(
+                         to_tsvector('english', coalesce(n.title,'') || ' ' || coalesce(n.body_plain,'') || ' ' || coalesce(n.tags,'')),
+                         plainto_tsquery('english', :q)
+                       ) AS rank
+                FROM notes n
+                WHERE n.book_id IN (:bookIds)
+                  AND (
+                    to_tsvector('english', coalesce(n.title,'') || ' ' || coalesce(n.body_plain,'') || ' ' || coalesce(n.tags,''))
+                        @@ plainto_tsquery('english', :q)
+                    OR lower(coalesce(n.title,'')) LIKE :like ESCAPE '\\'
+                    OR lower(coalesce(n.body_plain,'')) LIKE :like ESCAPE '\\'
+                    OR lower(coalesce(n.tags,'')) LIKE :like ESCAPE '\\'
+                  )
+                """);
+        noteQuery.setParameter("q", query);
+        noteQuery.setParameter("like", like);
+        noteQuery.setParameter("bookIds", bookIds);
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = noteQuery.getResultList();
+
+        Map<UUID, Chapter> chapterCache = new HashMap<>();
+        Map<UUID, Section> sectionCache = new HashMap<>();
+        for (Object[] row : rows) {
+            UUID noteId = UUID.fromString((String) row[0]);
+            UUID bookId = UUID.fromString((String) row[1]);
+            UUID chapterId = row[2] != null ? UUID.fromString((String) row[2]) : null;
+            UUID sectionId = row[3] != null ? UUID.fromString((String) row[3]) : null;
+            String title = (String) row[4];
+            String bodyPlain = (String) row[5];
+            Book book = booksById.get(bookId);
+            if (book == null) continue;
+            double rank = row[6] != null ? ((Number) row[6]).doubleValue() : 0;
+            String chapterTitle = null;
+            String sectionTitle = null;
+            if (chapterId != null) {
+                Chapter chapter = chapterCache.computeIfAbsent(chapterId,
+                        id -> chapterRepository.findById(id).orElse(null));
+                if (chapter != null) {
+                    chapterTitle = chapter.getTitle();
                 }
             }
-
-            for (Note note : noteRepository.findFiltered(bookId, null, null)) {
-                boolean matchTitle = contains(note.getTitle(), needle);
-                boolean matchBody = contains(note.getBodyPlain(), needle);
-                boolean matchTags = note.getTags() != null && note.getTags().toLowerCase(Locale.ROOT).contains(needle);
-                if (!matchTitle && !matchBody && !matchTags) {
-                    continue;
+            if (sectionId != null) {
+                Section section = sectionCache.computeIfAbsent(sectionId,
+                        id -> sectionRepository.findById(id).orElse(null));
+                if (section != null) {
+                    sectionTitle = section.getTitle();
                 }
-                String href = "/books/" + bookId + "/notes/" + note.getId();
-                String chapterTitle = note.getChapter() != null ? note.getChapter().getTitle() : null;
-                String sectionTitle = note.getSection() != null ? note.getSection().getTitle() : null;
-                hits.add(new SearchResponse.SearchHit(
-                        "NOTE",
-                        note.getId(),
-                        bookId,
-                        book.getTitle(),
-                        note.getChapter() != null ? note.getChapter().getId() : null,
-                        chapterTitle,
-                        note.getSection() != null ? note.getSection().getId() : null,
-                        sectionTitle,
-                        note.getTitle() != null ? note.getTitle() : "Untitled note",
-                        snippet(note.getBodyPlain(), needle),
-                        href
-                ));
             }
+            put(hits, "NOTE:" + noteId, rank, "NOTE", new SearchResponse.SearchHit(
+                    "NOTE", noteId, bookId, book.getTitle(),
+                    chapterId, chapterTitle, sectionId, sectionTitle,
+                    title != null ? title : "Untitled note",
+                    snippet(bodyPlain, needle),
+                    "/books/" + bookId + "/notes/" + noteId
+            ));
         }
+    }
 
-        hits.sort(Comparator
-                .comparing((SearchResponse.SearchHit h) -> typeRank(h.type()))
-                .thenComparing(h -> h.title() == null ? "" : h.title().toLowerCase(Locale.ROOT)));
-
-        if (hits.size() > MAX_HITS) {
-            hits = hits.subList(0, MAX_HITS);
+    private static void put(Map<String, RankedHit> hits, String key, double rank, String type,
+                            SearchResponse.SearchHit hit) {
+        RankedHit existing = hits.get(key);
+        if (existing == null || rank > existing.rank()) {
+            hits.put(key, new RankedHit(rank, typeRank(type), hit));
         }
-        return new SearchResponse(query, List.copyOf(hits));
+    }
+
+    private record RankedHit(double rank, int typeRank, SearchResponse.SearchHit hit) {
     }
 
     private static int typeRank(String type) {
@@ -164,8 +278,8 @@ public class SearchService {
         };
     }
 
-    private static boolean contains(String haystack, String needle) {
-        return haystack != null && haystack.toLowerCase(Locale.ROOT).contains(needle);
+    private static String escapeLike(String value) {
+        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     private static String snippet(String text, String needle) {

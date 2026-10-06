@@ -11,10 +11,12 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
@@ -22,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -523,6 +526,16 @@ class ApiIntegrationTest {
                 .andExpect(jsonPath("$.hits.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)))
                 .andExpect(jsonPath("$.hits[0].type").value("NOTE"));
 
+        // Minimal 1x1 PNG
+        byte[] png = Base64.getDecoder().decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
+        mockMvc.perform(multipart("/api/v1/books/" + bookId + "/cover")
+                        .file(new MockMultipartFile("file", "cover.png", "image/png", png))
+                        .session(session)
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.coverUrl").isNotEmpty());
+
         MvcResult mdExport = mockMvc.perform(get("/api/v1/books/" + bookId + "/export")
                         .session(session)
                         .param("format", "markdown"))
@@ -536,7 +549,9 @@ class ApiIntegrationTest {
                 .andReturn();
         String exportBody = jsonExport.getResponse().getContentAsString();
         assertThat(exportBody).contains("rebeautifier.book-backup");
-        assertThat(exportBody).contains("schemaVersion");
+        assertThat(exportBody).contains("\"schemaVersion\":2");
+        assertThat(exportBody).contains("coverBase64");
+        assertThat(exportBody).contains("image/png");
 
         mockMvc.perform(post("/api/v1/books/import")
                         .session(session)
@@ -546,18 +561,32 @@ class ApiIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("IMPORT_INVALID"));
 
+        // Legacy v1 (no cover) still imports
         mockMvc.perform(post("/api/v1/books/import")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"schema":"rebeautifier.book-backup","schemaVersion":1,"book":{"title":"Legacy V1 Book","chapters":[],"notes":[]}}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.title").value("Legacy V1 Book"));
+
+        MvcResult imported = mockMvc.perform(post("/api/v1/books/import")
                         .session(session)
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(exportBody))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.title").value("Integration Book"))
-                .andExpect(jsonPath("$.myRole").value("OWNER"));
+                .andExpect(jsonPath("$.myRole").value("OWNER"))
+                .andExpect(jsonPath("$.coverUrl").isNotEmpty())
+                .andReturn();
+        assertThat(imported.getResponse().getContentAsString()).contains("/api/v1/covers/");
 
         mockMvc.perform(get("/api/v1/books").session(session))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(2)));
+                .andExpect(jsonPath("$.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(3)));
     }
 
     @Test

@@ -124,7 +124,7 @@ export function BackupPage() {
         <div className="library-header">
           <div>
             <h1>Backup & restore</h1>
-            <p className="muted">Export a book as Markdown or JSON. Restore a validated JSON backup as a new book you own.</p>
+            <p className="muted">Export a book as Markdown or JSON (covers included in JSON v2). Restore a validated JSON backup as a new book you own.</p>
           </div>
         </div>
 
@@ -162,7 +162,7 @@ export function BackupPage() {
         <section className="detail-panel">
           <h2>Restore JSON backup</h2>
           <p className="muted panel-sub">
-            Paste a Rebeautifier backup (`schema: rebeautifier.book-backup`, version 1). Invalid files are rejected with a clear error.
+            Paste a Rebeautifier backup (`schema: rebeautifier.book-backup`, version 1 or 2). Version 2 may include a cover image. Invalid files are rejected with a clear error.
           </p>
           <form className="form-stack" onSubmit={(e) => void onImport(e)}>
             <label className="btn btn-ghost" style={{ width: 'fit-content' }}>
@@ -178,7 +178,7 @@ export function BackupPage() {
               value={importText}
               onChange={(e) => setImportText(e.target.value)}
               rows={14}
-              placeholder='{"schema":"rebeautifier.book-backup","schemaVersion":1,"book":{...}}'
+              placeholder='{"schema":"rebeautifier.book-backup","schemaVersion":2,"book":{...}}'
               required
             />
             <button className="btn btn-primary" type="submit" disabled={busy || !importText.trim()}>
