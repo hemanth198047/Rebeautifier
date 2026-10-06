@@ -6,14 +6,31 @@ Self-hosted install. No cloud accounts required.
 
 Requirements: Docker Engine + Docker Compose v2.
 
+**Linux / macOS**
+
 ```bash
 git clone https://github.com/hemanth198047/Rebeautifier.git
 cd Rebeautifier
-cp .env.example .env   # optional
-docker compose up --build
+./start.sh
+```
+
+**Windows** (Docker Desktop running)
+
+```bat
+git clone https://github.com/hemanth198047/Rebeautifier.git
+cd Rebeautifier
+start.bat
 ```
 
 Open http://localhost:8080
+
+The start scripts copy `.env.example` → `.env` when needed, run `docker compose up --build -d`, and wait until `/api/v1/health/ready` is green.
+
+| Script | Platform | Notes |
+| --- | --- | --- |
+| `start.sh` / `stop.sh` | Linux, macOS | `--ai`, `--pull-model`, `--host-gateway`, `--purge` |
+| `start.bat` / `stop.bat` | Windows CMD | `--ai`, `--pull-model`, `--host-gateway`, `--purge` |
+| `start.ps1` / `stop.ps1` | Windows PowerShell | `-Ai`, `-PullModel`, `-HostGateway`, `-Purge` |
 
 Demo users (when `SEED_DEMO_DATA=true`, the default for Compose):
 
@@ -25,7 +42,8 @@ Demo users (when `SEED_DEMO_DATA=true`, the default for Compose):
 Stop:
 
 ```bash
-docker compose down
+./stop.sh
+# Windows: stop.bat
 ```
 
 Data persists in volumes: `pgdata` (Postgres), `covers` (book cover files), `ollama` (models when AI profile is used).
@@ -33,8 +51,8 @@ Data persists in volumes: `pgdata` (Postgres), `covers` (book cover files), `oll
 ### Optional local AI
 
 ```bash
-docker compose --profile ai up --build
-docker compose --profile ai exec ollama ollama pull llama3.2:1b
+./start.sh --ai --pull-model
+# Windows: start.bat --ai --pull-model
 ```
 
 Default model `llama3.2:1b` targets ~4 GB RAM hosts with concurrency `1`. Notes still work when Ollama is absent — Settings and the AI chip show offline guidance.
