@@ -2,7 +2,7 @@
 
 A calm, installable reading library for organizing thoughts as **Book → Chapter → Section → Notes**. Multi-user accounts with Owner / Editor / Viewer membership. Rich-text notes work without AI. Optional local AI refine via **Ollama** (backend-only).
 
-**Version:** 0.6.0 · Full setup: [`SETUP.md`](./SETUP.md) · Acceptance: [`ACCEPTANCE.md`](./ACCEPTANCE.md)
+**Version:** 0.7.0 · Full setup: [`SETUP.md`](./SETUP.md) · Acceptance: [`ACCEPTANCE.md`](./ACCEPTANCE.md)
 
 ## Stack
 
@@ -62,18 +62,19 @@ Second demo user: `editor` / `password123` (editor on *Morning Pages*).
 
 Optional env file: copy [`.env.example`](./.env.example) to `.env` (created automatically by `start.sh` / `start.bat` if missing).
 
-### Optional AI (Ollama)
+### Optional AI (Ollama or API key)
+
+In the app: **Settings → AI** — enable/disable, choose **Local Ollama** or an **OpenAI-compatible API key**, set the model, and (for Ollama) **Pull model** from the UI. Notes still work when AI is disabled.
+
+Optional Compose helper to run a local Ollama sidecar:
 
 ```bash
-./start.sh --ai --pull-model
+./start.sh --ai
 # or:
 docker compose --profile ai up --build
-docker compose --profile ai exec ollama ollama pull llama3.2:1b
 ```
 
-Default model: `llama3.2:1b` (4 GB RAM friendly). Override with `OLLAMA_MODEL` / `OLLAMA_BASE_URL`.
-
-Without the AI profile, notes still work; the UI shows **AI offline** (see **Settings**).
+Default Ollama model: `llama3.2:1b` (4 GB RAM friendly). Override defaults with `OLLAMA_MODEL` / `OLLAMA_BASE_URL` if needed.
 
 Stop:
 

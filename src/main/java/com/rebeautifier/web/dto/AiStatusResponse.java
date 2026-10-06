@@ -4,6 +4,8 @@ import java.util.List;
 
 public record AiStatusResponse(
         boolean available,
+        boolean enabled,
+        String provider,
         boolean reachable,
         boolean modelAvailable,
         String model,

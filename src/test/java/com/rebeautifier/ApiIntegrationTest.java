@@ -322,9 +322,25 @@ class ApiIntegrationTest {
     @Test
     @Order(7)
     void refineAcceptAndStaleWithMockOllama() throws Exception {
+        mockMvc.perform(put("/api/v1/settings/ai")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"enabled":true,"provider":"OLLAMA","model":"llama3.2:1b","baseUrl":null,"apiKey":null,"clearApiKey":false,"pullModelOnSave":false}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(true))
+                .andExpect(jsonPath("$.provider").value("OLLAMA"));
+
+        mockMvc.perform(get("/api/v1/settings/ai").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(true));
+
         mockMvc.perform(get("/api/v1/system/ai-status").session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.available").value(true))
+                .andExpect(jsonPath("$.enabled").value(true))
                 .andExpect(jsonPath("$.model").value("llama3.2:1b"));
 
         MvcResult refine = mockMvc.perform(post("/api/v1/notes/" + noteIdForAi + "/refinements")

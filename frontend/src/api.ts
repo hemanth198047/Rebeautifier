@@ -93,8 +93,12 @@ export type NoteRevision = {
   finalizedAt: string | null
 }
 
+export type AiProvider = 'OLLAMA' | 'OPENAI_COMPATIBLE'
+
 export type AiStatus = {
   available: boolean
+  enabled: boolean
+  provider: AiProvider | string
   reachable: boolean
   modelAvailable: boolean
   model: string
@@ -109,6 +113,23 @@ export type AiStatus = {
   metricsSucceeded: number
   metricsFailed: number
   metricsAverageLatencyMs: number
+}
+
+export type AiSettings = {
+  enabled: boolean
+  provider: AiProvider
+  model: string
+  baseUrl: string
+  apiKeyConfigured: boolean
+  apiKeyHint: string | null
+  pullMessage: string | null
+  updatedAt: string | null
+}
+
+export type AiPullResult = {
+  success: boolean
+  message: string
+  modelAvailable: boolean
 }
 
 export type RateLimitStatus = {

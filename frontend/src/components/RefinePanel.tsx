@@ -232,7 +232,7 @@ export function RefinePanel({
       <div className={`ai-status-banner ${aiStatus?.available ? 'is-online' : 'is-offline'}`}>
         {aiStatus ? (
           <>
-            <strong>{aiStatus.available ? 'AI online' : 'AI offline — notes still work'}</strong>
+            <strong>{aiStatus.available ? 'AI online' : aiStatus.enabled === false ? 'AI disabled — notes still work' : 'AI offline — notes still work'}</strong>
             <span>{aiStatus.message}</span>
             <span className="muted">
               Model {aiStatus.model} · queue {aiStatus.inFlight}/{aiStatus.maxConcurrent}

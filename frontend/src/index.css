@@ -1310,6 +1310,33 @@ select:focus {
   margin-top: 1rem;
 }
 
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-family: var(--font-ui);
+}
+
+.checkbox-row input {
+  width: auto;
+  margin: 0;
+}
+
+.provider-fieldset {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.75rem 1rem 0.9rem;
+  margin: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.provider-fieldset legend {
+  font-family: var(--font-ui);
+  padding: 0 0.35rem;
+  color: var(--text-muted);
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;

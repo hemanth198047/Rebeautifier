@@ -116,7 +116,7 @@ Env knobs (API process):
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama HTTP API |
 | `OLLAMA_MODEL` | `llama3.2:1b` | Default refine model |
 | `OLLAMA_MAX_CONCURRENT` | `1` | In-flight AI jobs |
-| `APP_VERSION` | `0.6.0` | Reported in health payloads |
+| `APP_VERSION` | `0.7.0` | Reported in health payloads |
 | `SESSION_COOKIE_SECURE` | `false` | Secure session cookie (HTTPS) |
 | `RATE_LIMIT_AUTH_PER_MINUTE` | `30` | Sliding-window auth login/register limit (in-memory per API process) |
 | `RATE_LIMIT_AI_PER_MINUTE` | `20` | Sliding-window AI refine limit (in-memory per API process) |
