@@ -12,6 +12,7 @@ import { RegisterPage } from './pages/RegisterPage'
 import { SectionPage } from './pages/SectionPage'
 import { SearchPage } from './pages/SearchPage'
 import { BackupPage } from './pages/BackupPage'
+import { SettingsPage } from './pages/SettingsPage'
 import { Navigate } from 'react-router-dom'
 import './index.css'
 
@@ -25,6 +26,7 @@ const router = createBrowserRouter([
       { path: '/library', element: <LibraryPage /> },
       { path: '/search', element: <SearchPage /> },
       { path: '/backup', element: <BackupPage /> },
+      { path: '/settings', element: <SettingsPage /> },
       { path: '/books/:bookId', element: <BookPage /> },
       { path: '/books/:bookId/chapters/:chapterId', element: <ChapterPage /> },
       {

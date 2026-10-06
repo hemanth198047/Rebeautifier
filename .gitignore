@@ -41,6 +41,7 @@ src/main/resources/static/
 ### App data ###
 data/
 *.log
+.env
 
 ### OS ###
 .DS_Store

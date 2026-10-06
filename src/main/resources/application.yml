@@ -32,6 +32,7 @@ server:
     include-message: never
 
 rebeautifier:
+  app-version: ${APP_VERSION:0.1.0}
   cors-origins: ${CORS_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
   cover-storage-path: ${COVER_STORAGE_PATH:./data/covers}
   seed-demo-data: ${SEED_DEMO_DATA:true}

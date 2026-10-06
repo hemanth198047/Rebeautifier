@@ -51,7 +51,14 @@ class ApiIntegrationTest {
     void healthIsPublic() throws Exception {
         mockMvc.perform(get("/api/v1/health"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("UP"));
+                .andExpect(jsonPath("$.status").value("UP"))
+                .andExpect(jsonPath("$.version").exists());
+
+        mockMvc.perform(get("/api/v1/health/ready"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"))
+                .andExpect(jsonPath("$.database").value("UP"))
+                .andExpect(jsonPath("$.version").exists());
     }
 
     @Test

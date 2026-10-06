@@ -109,6 +109,9 @@ export function BackupPage() {
           <Link className="btn btn-ghost" to="/search">
             Search
           </Link>
+          <Link className="btn btn-ghost" to="/settings">
+            Settings
+          </Link>
           <AiStatusChip compact />
           <span className="muted">{user?.displayName}</span>
           <button className="btn btn-ghost" type="button" onClick={() => void logout()}>
