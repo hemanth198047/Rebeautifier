@@ -543,8 +543,8 @@ class ApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
         assertThat(mdExport.getResponse().getContentAsString()).contains("# Integration Book");
-        assertThat(mdExport.getResponse().getContentAsString()).contains("Cover image is present");
-        assertThat(mdExport.getResponse().getContentAsString()).contains("JSON export");
+        assertThat(mdExport.getResponse().getContentAsString()).contains("![Cover](data:image/png;base64,");
+        assertThat(mdExport.getResponse().getContentAsString()).doesNotContain("JSON export");
         MvcResult jsonExport = mockMvc.perform(get("/api/v1/books/" + bookId + "/export")
                         .session(session)
                         .param("format", "json"))
@@ -611,6 +611,18 @@ class ApiIntegrationTest {
                 .andExpect(jsonPath("$.metricsSucceeded").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)))
                 .andExpect(jsonPath("$.metricsFailed").exists())
                 .andExpect(jsonPath("$.metricsAverageLatencyMs").exists());
+
+        mockMvc.perform(patch("/api/v1/auth/me")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"displayName\":\"Updated Tester\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.displayName").value("Updated Tester"));
+
+        mockMvc.perform(get("/api/v1/auth/me").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.displayName").value("Updated Tester"));
 
         mockMvc.perform(post("/api/v1/auth/change-password")
                         .session(session)

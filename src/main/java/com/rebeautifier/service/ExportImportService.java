@@ -34,6 +34,8 @@ public class ExportImportService {
 
     private static final Pattern TAG_STRIP = Pattern.compile("<[^>]+>");
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+    /** Raw cover bytes above this stay as a note; below are embedded as a Markdown data URI. */
+    static final int MARKDOWN_COVER_EMBED_MAX_BYTES = 512 * 1024;
 
     private final AuthService authService;
     private final AccessControlService accessControlService;
@@ -88,11 +90,7 @@ public class ExportImportService {
         BookBackupDocument.BookPayload payload = buildBookPayload(book);
         StringBuilder md = new StringBuilder();
         md.append("# ").append(escapeMd(payload.title())).append("\n\n");
-        if (payload.coverBase64() != null && !payload.coverBase64().isBlank()) {
-            md.append("_Cover image is present on this book (")
-                    .append(payload.coverMime() != null ? payload.coverMime() : "image")
-                    .append("). Use JSON export to preserve the binary cover; Markdown cannot embed it._\n\n");
-        }
+        appendCoverMarkdown(md, payload);
         if (payload.description() != null && !payload.description().isBlank()) {
             md.append(payload.description().trim()).append("\n\n");
         }
@@ -435,6 +433,37 @@ public class ExportImportService {
             note.setBodyOriginal(note.getBodyRich());
         }
         noteRepository.save(note);
+    }
+
+    private void appendCoverMarkdown(StringBuilder md, BookBackupDocument.BookPayload payload) {
+        if (payload.coverBase64() == null || payload.coverBase64().isBlank()) {
+            return;
+        }
+        String mime = payload.coverMime() != null && !payload.coverMime().isBlank()
+                ? payload.coverMime()
+                : "image/png";
+        byte[] raw;
+        try {
+            raw = Base64.getDecoder().decode(payload.coverBase64());
+        } catch (IllegalArgumentException ex) {
+            md.append("_Cover image is present but could not be decoded for Markdown._\n\n");
+            return;
+        }
+        if (raw.length <= MARKDOWN_COVER_EMBED_MAX_BYTES) {
+            md.append("![Cover](data:")
+                    .append(mime)
+                    .append(";base64,")
+                    .append(payload.coverBase64())
+                    .append(")\n\n");
+            return;
+        }
+        md.append("_Cover image is present (")
+                .append(mime)
+                .append(", ")
+                .append(raw.length)
+                .append(" bytes) but exceeds the Markdown embed limit of ")
+                .append(MARKDOWN_COVER_EMBED_MAX_BYTES)
+                .append(" bytes. Use JSON export to preserve the binary cover._\n\n");
     }
 
     private void appendNoteMarkdown(StringBuilder md, BookBackupDocument.NotePayload note, int headingLevel) {

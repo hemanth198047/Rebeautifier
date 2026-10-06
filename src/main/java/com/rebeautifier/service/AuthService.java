@@ -10,6 +10,8 @@ import com.rebeautifier.web.error.ApiException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -23,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -56,6 +60,7 @@ public class AuthService {
         userRepository.save(user);
 
         authenticateAndPersist(request.username(), request.password(), httpRequest, httpResponse);
+        log.info("event=auth_register userId={} username={}", user.getId(), user.getUsername());
         return toResponse(user);
     }
 
@@ -65,14 +70,26 @@ public class AuthService {
                               HttpServletResponse httpResponse) {
         authenticateAndPersist(request.usernameOrEmail(), request.password(), httpRequest, httpResponse);
         AppUserDetails principal = currentPrincipal();
+        log.info("event=auth_login userId={} username={}", principal.getId(), principal.getUsername());
         return new UserResponse(principal.getId(), principal.getUsername(), principal.getEmail(), principal.getDisplayName());
     }
 
     public void logout(HttpServletRequest request, HttpServletResponse response) {
+        AppUserDetails principal = null;
+        try {
+            principal = currentPrincipal();
+        } catch (ApiException ignored) {
+            // already unauthenticated
+        }
         SecurityContextHolder.clearContext();
         HttpSession session = request.getSession(false);
         if (session != null) {
             session.invalidate();
+        }
+        if (principal != null) {
+            log.info("event=auth_logout userId={} username={}", principal.getId(), principal.getUsername());
+        } else {
+            log.info("event=auth_logout userId=anonymous");
         }
         response.setStatus(HttpServletResponse.SC_NO_CONTENT);
     }
@@ -82,6 +99,20 @@ public class AuthService {
         AppUserDetails principal = currentPrincipal();
         User user = userRepository.findById(principal.getId())
                 .orElseThrow(() -> ApiException.notFound("User not found"));
+        return toResponse(user);
+    }
+
+    @Transactional
+    public UserResponse updateProfile(String displayName) {
+        User user = requireCurrentUser();
+        String trimmed = displayName.trim();
+        if (trimmed.isEmpty()) {
+            throw ApiException.badRequest("Display name is required");
+        }
+        user.setDisplayName(trimmed);
+        userRepository.save(user);
+        refreshPrincipal(user);
+        log.info("event=auth_profile_update userId={} username={}", user.getId(), user.getUsername());
         return toResponse(user);
     }
 
@@ -96,6 +127,20 @@ public class AuthService {
         }
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         userRepository.save(user);
+        log.info("event=auth_password_change userId={} username={}", user.getId(), user.getUsername());
+    }
+
+    private void refreshPrincipal(User user) {
+        Authentication current = SecurityContextHolder.getContext().getAuthentication();
+        if (current == null) {
+            return;
+        }
+        AppUserDetails details = new AppUserDetails(user);
+        Authentication updated = new UsernamePasswordAuthenticationToken(
+                details, current.getCredentials(), details.getAuthorities());
+        SecurityContext context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(updated);
+        SecurityContextHolder.setContext(context);
     }
 
     @Transactional(readOnly = true)
