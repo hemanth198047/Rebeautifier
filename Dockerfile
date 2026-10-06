@@ -10,11 +10,10 @@ RUN npm run build
 FROM maven:3.9.9-eclipse-temurin-17 AS api-build
 WORKDIR /app
 COPY pom.xml .
-COPY .mvn .mvn
-COPY mvnw mvnw
 COPY src src
 COPY --from=frontend-build /frontend/dist/ src/main/resources/static/
-RUN chmod +x mvnw && ./mvnw -DskipTests package
+# Use the image Maven directly (avoids Windows CRLF breaking ./mvnw in Docker).
+RUN mvn -B -DskipTests package
 
 FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
@@ -24,7 +23,8 @@ RUN apt-get update \
     && mkdir -p /app/data/covers
 COPY --from=api-build /app/target/rebeautifier.jar /app/app.jar
 COPY docker/api-entrypoint.sh /app/api-entrypoint.sh
-RUN chmod +x /app/api-entrypoint.sh
+# Normalize CRLF if the script was checked out on Windows.
+RUN sed -i 's/\r$//' /app/api-entrypoint.sh && chmod +x /app/api-entrypoint.sh
 ENV SERVER_PORT=8080 \
     COVER_STORAGE_PATH=/app/data/covers \
     SEED_DEMO_DATA=true \

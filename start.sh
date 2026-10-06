@@ -88,14 +88,14 @@ API_PORT="$(grep -E '^[[:space:]]*API_PORT=' .env 2>/dev/null | tail -n1 | cut -
 API_PORT="${API_PORT:-8080}"
 BASE_URL="http://localhost:${API_PORT}"
 
-echo "Starting Rebeautifier (Compose)…"
+echo Starting Rebeautifier (Compose)...
 "${COMPOSE[@]}" "${FILE_ARGS[@]}" "${PROFILE_ARGS[@]}" up "${BUILD_ARGS[@]}" "${DETACH_ARGS[@]}"
 
 if [[ "$FOREGROUND" -eq 1 ]]; then
   exit 0
 fi
 
-echo "Waiting for API readiness at ${BASE_URL}/api/v1/health/ready …"
+echo "Waiting for API readiness at ${BASE_URL}/api/v1/health/ready ..."
 ready=0
 for _ in $(seq 1 90); do
   code="$(curl -sS -o /dev/null -w '%{http_code}' "${BASE_URL}/api/v1/health/ready" 2>/dev/null || true)"
@@ -120,7 +120,7 @@ fi
 if [[ "$WITH_AI" -eq 1 && "$PULL_MODEL" -eq 1 ]]; then
   MODEL="$(grep -E '^[[:space:]]*OLLAMA_MODEL=' .env 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d '\r' || true)"
   MODEL="${MODEL:-llama3.2:1b}"
-  echo "Pulling Ollama model ${MODEL} (may take a while)…"
+  echo "Pulling Ollama model ${MODEL} (may take a while)..."
   "${COMPOSE[@]}" "${FILE_ARGS[@]}" --profile ai exec -T ollama ollama pull "$MODEL" || {
     echo "Model pull failed; AI will show offline until the model is available." >&2
   }

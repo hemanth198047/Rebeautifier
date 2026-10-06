@@ -31,9 +31,9 @@ if ($Ai) { $composeArgs += @('--profile', 'ai') }
 $composeArgs += 'down'
 if ($Purge) {
     $composeArgs += '-v'
-    Write-Host 'Stopping Rebeautifier and removing volumes…'
+    Write-Host 'Stopping Rebeautifier and removing volumes...'
 } else {
-    Write-Host 'Stopping Rebeautifier (volumes kept)…'
+    Write-Host 'Stopping Rebeautifier (volumes kept)...'
 }
 
 & docker compose @composeArgs

@@ -56,11 +56,11 @@ $composeArgs += 'up'
 if (-not $NoRebuild) { $composeArgs += '--build' }
 $composeArgs += '-d'
 
-Write-Host 'Starting Rebeautifier (Compose)…'
+Write-Host 'Starting Rebeautifier (Compose)...'
 & docker compose @composeArgs
 if ($LASTEXITCODE -ne 0) { throw 'Failed to start Compose services.' }
 
-Write-Host "Waiting for API readiness at $baseUrl/api/v1/health/ready …"
+Write-Host "Waiting for API readiness at $baseUrl/api/v1/health/ready ..."
 $ready = $false
 for ($i = 0; $i -lt 90; $i++) {
     try {
@@ -95,7 +95,7 @@ if ($Ai -and $PullModel) {
             if ($_ -match '^\s*OLLAMA_MODEL\s*=\s*(.+)\s*$') { $model = $Matches[1].Trim() }
         }
     }
-    Write-Host "Pulling Ollama model $model (may take a while)…"
+    Write-Host "Pulling Ollama model $model (may take a while)..."
     $pullArgs = @('-f', 'docker-compose.yml')
     if ($HostGateway -or $env:REBEAUTIFIER_HOST_GATEWAY -eq '1') {
         $pullArgs += @('-f', 'docker-compose.host-gateway.yml')
