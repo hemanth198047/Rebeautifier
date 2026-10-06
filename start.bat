@@ -7,6 +7,7 @@ REM   start.bat
 REM   start.bat --ai
 REM   start.bat --ai --pull-model
 REM   start.bat --no-rebuild
+REM   start.bat --host-gateway
 
 cd /d "%~dp0"
 
@@ -45,6 +46,13 @@ if errorlevel 1 (
   exit /b 1
 )
 
+docker info >nul 2>&1
+if errorlevel 1 (
+  echo Docker Desktop does not appear to be running.
+  echo Start Docker Desktop, wait until it says "Running", then retry.
+  exit /b 1
+)
+
 docker compose version >nul 2>&1
 if errorlevel 1 (
   echo Docker Compose v2 "docker compose" is required.
@@ -58,7 +66,7 @@ if not exist ".env" if exist ".env.example" (
 
 set "API_PORT=8080"
 if exist ".env" (
-  for /f "usebackq tokens=1,* delims==" %%A in (`.env`) do (
+  for /f "usebackq tokens=1,* delims== eol=#" %%A in (".env") do (
     if /I "%%A"=="API_PORT" set "API_PORT=%%B"
   )
 )
@@ -76,14 +84,14 @@ if "!WITH_AI!"=="1" set "PROFILE_ARGS=--profile ai"
 set "BUILD_ARGS="
 if "!REBUILD!"=="1" set "BUILD_ARGS=--build"
 
-echo Starting Rebeautifier ^(Compose^)…
+echo Starting Rebeautifier ^(Compose^)...
 docker compose !FILE_ARGS! !PROFILE_ARGS! up !BUILD_ARGS! -d
 if errorlevel 1 (
   echo Failed to start Compose services.
   exit /b 1
 )
 
-echo Waiting for API readiness at !BASE_URL!/api/v1/health/ready …
+echo Waiting for API readiness at !BASE_URL!/api/v1/health/ready ...
 set "READY=0"
 for /L %%I in (1,1,90) do (
   if "!READY!"=="0" (
@@ -109,11 +117,11 @@ if "!READY!"=="0" (
 if "!WITH_AI!"=="1" if "!PULL_MODEL!"=="1" (
   set "MODEL=llama3.2:1b"
   if exist ".env" (
-    for /f "usebackq tokens=1,* delims==" %%A in (`.env`) do (
+    for /f "usebackq tokens=1,* delims== eol=#" %%A in (".env") do (
       if /I "%%A"=="OLLAMA_MODEL" set "MODEL=%%B"
     )
   )
-  echo Pulling Ollama model !MODEL! ^(may take a while^)…
+  echo Pulling Ollama model !MODEL! ^(may take a while^)...
   docker compose !FILE_ARGS! --profile ai exec -T ollama ollama pull !MODEL!
   if errorlevel 1 echo Model pull failed; AI will show offline until the model is available.
 )

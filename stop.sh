@@ -62,9 +62,9 @@ fi
 DOWN_ARGS=()
 if [[ "$PURGE" -eq 1 ]]; then
   DOWN_ARGS=(-v)
-  echo "Stopping Rebeautifier and removing volumes…"
+  echo "Stopping Rebeautifier and removing volumes..."
 else
-  echo "Stopping Rebeautifier (volumes kept)…"
+  echo "Stopping Rebeautifier (volumes kept)..."
 fi
 
 "${COMPOSE[@]}" "${FILE_ARGS[@]}" "${PROFILE_ARGS[@]}" down "${DOWN_ARGS[@]}"
