@@ -6,6 +6,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
+/**
+ * Retained from the original scaffold; API-prefixed so it does not collide with the SPA.
+ */
 @RestController
 public class HomeController {
 
@@ -15,7 +18,7 @@ public class HomeController {
         this.welcomeService = welcomeService;
     }
 
-    @GetMapping("/")
+    @GetMapping("/api/v1")
     public Map<String, String> home() {
         return welcomeService.welcome();
     }
